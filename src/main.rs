@@ -26,9 +26,11 @@ fn main() -> Result<()> {
             println!("📋 Scanning dependencies...");
             println!();
 
-            // Phase 1 pipeline: parse the dep tree
+            // Parse the dep tree
             let manifest = opts.manifest_path.as_deref();
             let deps = cargo_bless::parser::get_deps(manifest)?;
+            let (project_name, project_version) =
+                cargo_bless::parser::get_project_info(manifest)?;
 
             let direct: Vec<_> = deps.iter().filter(|d| d.is_direct).collect();
             let transitive: Vec<_> = deps.iter().filter(|d| !d.is_direct).collect();
@@ -70,7 +72,12 @@ fn main() -> Result<()> {
                 .bold()
             );
 
-            // TODO Phase 2: suggestions::analyze() → output::render_report()
+            // Suggestion engine: load rules → analyze → report
+            println!();
+            let rules = cargo_bless::suggestions::load_rules();
+            let suggestions = cargo_bless::suggestions::analyze(&deps, &rules);
+            cargo_bless::output::render_report(&project_name, &project_version, &suggestions);
+
             // TODO Phase 3: intel::fetch_metadata() enrichment
 
             Ok(())

@@ -28,6 +28,26 @@ impl fmt::Display for ResolvedDep {
     }
 }
 
+/// Get the root project's name and version from Cargo metadata.
+pub fn get_project_info(manifest_path: Option<&Path>) -> Result<(String, String)> {
+    let mut cmd = MetadataCommand::new();
+    if let Some(path) = manifest_path {
+        cmd.manifest_path(path);
+    }
+    let metadata = cmd.exec()?;
+    let root_id = metadata
+        .resolve
+        .as_ref()
+        .and_then(|r| r.root.as_ref())
+        .ok_or_else(|| anyhow::anyhow!("No root package found"))?;
+    let root_pkg = metadata
+        .packages
+        .iter()
+        .find(|p| &p.id == root_id)
+        .ok_or_else(|| anyhow::anyhow!("Root package not in packages list"))?;
+    Ok((root_pkg.name.clone(), root_pkg.version.to_string()))
+}
+
 /// Parse the dependency tree for the project at `manifest_path`.
 /// If `manifest_path` is None, uses the current directory.
 pub fn get_deps(manifest_path: Option<&Path>) -> Result<Vec<ResolvedDep>> {
