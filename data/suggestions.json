@@ -15,6 +15,13 @@
     "source": "std docs"
   },
   {
+    "pattern": "once_cell",
+    "replacement": "std::sync::LazyLock / OnceLock",
+    "kind": "StdReplacement",
+    "reason": "LazyLock and OnceLock stable since Rust 1.80 — zero extra dependencies",
+    "source": "std docs"
+  },
+  {
     "pattern": "structopt",
     "replacement": "clap v4 (derive)",
     "kind": "ModernAlternative",
@@ -29,11 +36,32 @@
     "source": "blessed.rs"
   },
   {
+    "pattern": "iron",
+    "replacement": "axum",
+    "kind": "Unmaintained",
+    "reason": "Iron is unmaintained — axum is the modern Tokio-native choice",
+    "source": "blessed.rs"
+  },
+  {
     "pattern": "memmap",
     "replacement": "memmap2",
     "kind": "Unmaintained",
     "reason": "Original crate unmaintained — memmap2 is the maintained fork",
     "source": "RustSec"
+  },
+  {
+    "pattern": "failure",
+    "replacement": "anyhow + thiserror",
+    "kind": "Unmaintained",
+    "reason": "failure is deprecated and unmaintained — anyhow (app) + thiserror (lib) is the standard",
+    "source": "blessed.rs"
+  },
+  {
+    "pattern": "log",
+    "replacement": "tracing",
+    "kind": "ModernAlternative",
+    "reason": "Structured, async-aware, span-based — the modern standard for observability",
+    "source": "blessed.rs"
   },
   {
     "pattern": "reqwest+serde_json",

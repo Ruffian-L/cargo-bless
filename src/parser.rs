@@ -45,7 +45,7 @@ pub fn get_project_info(manifest_path: Option<&Path>) -> Result<(String, String)
         .iter()
         .find(|p| &p.id == root_id)
         .ok_or_else(|| anyhow::anyhow!("Root package not in packages list"))?;
-    Ok((root_pkg.name.clone(), root_pkg.version.to_string()))
+    Ok((root_pkg.name.to_string(), root_pkg.version.to_string()))
 }
 
 /// Parse the dependency tree for the project at `manifest_path`.
@@ -86,7 +86,7 @@ pub fn get_deps(manifest_path: Option<&Path>) -> Result<Vec<ResolvedDep>> {
         }
 
         deps.push(ResolvedDep {
-            name: pkg.name.clone(),
+            name: pkg.name.to_string(),
             version: pkg.version.to_string(),
             features: pkg.features.keys().cloned().collect(),
             source: pkg.source.as_ref().map(|s| s.repr.clone()),

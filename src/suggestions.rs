@@ -116,7 +116,7 @@ mod tests {
     #[test]
     fn test_load_rules() {
         let rules = load_rules();
-        assert_eq!(rules.len(), 7, "should load all 7 starter rules");
+        assert_eq!(rules.len(), 11, "should load all 11 starter rules");
 
         // Spot-check a known rule
         let lazy = rules.iter().find(|r| r.pattern == "lazy_static").unwrap();
