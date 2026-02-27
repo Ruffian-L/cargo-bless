@@ -91,6 +91,8 @@ Changes that would be applied:
 | `reqwest` + `serde_json` | `reqwest` with `json` feature | FeatureOptimization | Low |
 | `tokio` + `async-std` | `tokio` only | ComboWin | Medium |
 | `log` + `env_logger` | `tracing` + `tracing-subscriber` | ComboWin | Medium |
+| `warp` | `axum` | ModernAlternative | Medium |
+| `rocket` | `axum` | ModernAlternative | Medium |
 
 Rules are embedded at compile time from `data/suggestions.json`. PRs to add more are welcome.
 
