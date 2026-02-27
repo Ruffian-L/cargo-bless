@@ -3,6 +3,7 @@
 
 use anyhow::Result;
 use cargo_metadata::{CargoOpt, MetadataCommand};
+use std::fmt;
 use std::path::Path;
 
 /// A resolved dependency with its name, version, and enabled features.
@@ -14,6 +15,17 @@ pub struct ResolvedDep {
     pub source: Option<String>,
     pub repository: Option<String>,
     pub is_direct: bool,
+}
+
+impl fmt::Display for ResolvedDep {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let tag = if self.is_direct { "direct" } else { "transitive" };
+        write!(f, "{} v{} ({})", self.name, self.version, tag)?;
+        if !self.features.is_empty() {
+            write!(f, " [{}]", self.features.join(", "))?;
+        }
+        Ok(())
+    }
 }
 
 /// Parse the dependency tree for the project at `manifest_path`.
@@ -81,5 +93,53 @@ mod tests {
             is_direct: true,
         };
         assert!(format!("{:?}", dep).contains("serde"));
+    }
+
+    #[test]
+    fn test_resolvedep_display() {
+        let dep = ResolvedDep {
+            name: "clap".into(),
+            version: "4.5.0".into(),
+            features: vec!["derive".into(), "std".into()],
+            source: Some("registry+https://github.com/rust-lang/crates.io-index".into()),
+            repository: None,
+            is_direct: true,
+        };
+        let display = format!("{}", dep);
+        assert!(display.contains("clap"));
+        assert!(display.contains("4.5.0"));
+        assert!(display.contains("direct"));
+        assert!(display.contains("[derive, std]"));
+    }
+
+    #[test]
+    fn test_resolvedep_display_transitive_no_features() {
+        let dep = ResolvedDep {
+            name: "unicode-ident".into(),
+            version: "1.0.0".into(),
+            features: vec![],
+            source: Some("registry+https://github.com/rust-lang/crates.io-index".into()),
+            repository: None,
+            is_direct: false,
+        };
+        let display = format!("{}", dep);
+        assert!(display.contains("transitive"));
+        assert!(!display.contains('['));
+    }
+
+    #[test]
+    fn test_get_deps_self() {
+        // Parse our own Cargo.toml as a self-test
+        let deps = get_deps(None).expect("should parse own project");
+        assert!(!deps.is_empty(), "should find at least one dependency");
+
+        // We know clap and serde are direct deps
+        let names: Vec<&str> = deps.iter().map(|d| d.name.as_str()).collect();
+        assert!(names.contains(&"clap"), "clap should be in deps");
+        assert!(names.contains(&"serde"), "serde should be in deps");
+
+        // At least some should be marked as direct
+        let direct_count = deps.iter().filter(|d| d.is_direct).count();
+        assert!(direct_count > 0, "should have direct dependencies");
     }
 }
