@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 use clap::Parser;
 use colored::*;
@@ -72,13 +74,56 @@ fn main() -> Result<()> {
                 .bold()
             );
 
-            // Suggestion engine: load rules → analyze → report
+            // Suggestion engine: load rules → analyze
             println!();
             let rules = cargo_bless::suggestions::load_rules();
             let suggestions = cargo_bless::suggestions::analyze(&deps, &rules);
-            cargo_bless::output::render_report(&project_name, &project_version, &suggestions);
 
-            // TODO Phase 3: intel::fetch_metadata() enrichment
+            // Live intelligence: fetch metadata for flagged deps (non-fatal)
+            let intel = if !suggestions.is_empty() {
+                // Collect unique crate names from suggestions
+                let crate_names: Vec<&str> = suggestions
+                    .iter()
+                    .flat_map(|s| s.current.split('+'))
+                    .collect();
+
+                match cargo_bless::intel::IntelClient::new() {
+                    Ok(client) => {
+                        println!("{}", "🌐 Fetching live intelligence...".dimmed());
+                        let result = client.fetch_bulk_intel(&crate_names);
+                        if result.is_empty() && !crate_names.is_empty() {
+                            println!(
+                                "{}",
+                                "⚠️  Live data unavailable (offline or rate-limited)"
+                                    .yellow()
+                                    .dimmed()
+                            );
+                        }
+                        println!();
+                        result
+                    }
+                    Err(_) => {
+                        println!(
+                            "{}",
+                            "⚠️  Could not initialize live intelligence (continuing without)"
+                                .yellow()
+                                .dimmed()
+                        );
+                        println!();
+                        HashMap::new()
+                    }
+                }
+            } else {
+                HashMap::new()
+            };
+
+            // Render the report
+            cargo_bless::output::render_report(
+                &project_name,
+                &project_version,
+                &suggestions,
+                &intel,
+            );
 
             Ok(())
         }
