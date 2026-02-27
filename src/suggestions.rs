@@ -18,6 +18,19 @@ pub struct Suggestion {
     pub impact: Impact,
 }
 
+impl Suggestion {
+    /// Whether this suggestion can be auto-applied by editing Cargo.toml only.
+    /// ModernAlternative and ComboWin require source code changes, so they stay advisory.
+    pub fn is_auto_fixable(&self) -> bool {
+        matches!(
+            self.kind,
+            SuggestionKind::StdReplacement
+                | SuggestionKind::Unmaintained
+                | SuggestionKind::FeatureOptimization
+        )
+    }
+}
+
 /// The type of suggestion.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SuggestionKind {
