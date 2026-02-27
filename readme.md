@@ -87,8 +87,10 @@ Changes that would be applied:
 | `actix-web` | `axum` | ModernAlternative | Medium |
 | `log` | `tracing` | ModernAlternative | Medium |
 | `chrono` | `time` | ModernAlternative | Medium |
+| `env_logger` | `tracing-subscriber` | ModernAlternative | Medium |
 | `reqwest` + `serde_json` | `reqwest` with `json` feature | FeatureOptimization | Low |
 | `tokio` + `async-std` | `tokio` only | ComboWin | Medium |
+| `log` + `env_logger` | `tracing` + `tracing-subscriber` | ComboWin | Medium |
 
 Rules are embedded at compile time from `data/suggestions.json`. PRs to add more are welcome.
 
