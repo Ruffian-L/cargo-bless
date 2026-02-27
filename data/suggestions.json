@@ -90,5 +90,19 @@
     "kind": "ComboWin",
     "reason": "Full modern observability stack — structured spans + subscriber",
     "source": "blessed.rs"
+  },
+  {
+    "pattern": "warp",
+    "replacement": "axum",
+    "kind": "ModernAlternative",
+    "reason": "axum is the actively maintained Tokio-native web framework",
+    "source": "blessed.rs"
+  },
+  {
+    "pattern": "rocket",
+    "replacement": "axum",
+    "kind": "ModernAlternative",
+    "reason": "axum is lighter, Tokio-native, and the blessed.rs pick for new projects",
+    "source": "blessed.rs"
   }
 ]
