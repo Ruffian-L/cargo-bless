@@ -1,0 +1,52 @@
+[package]
+name = "cargo-bless"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+description = "Modernize your Rust dependencies with blessed.rs + live intel"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/cargo-bless"
+keywords = ["cargo", "dependencies", "modernize", "blessed", "lint"]
+categories = ["development-tools::cargo-plugins"]
+
+[[bin]]
+name = "cargo-bless"
+path = "src/main.rs"
+
+[dependencies]
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Cargo parsing
+cargo_metadata = "0.19"
+
+# crates.io API
+crates_io_api = "0.12"
+
+# TOML editing (comment-preserving)
+toml_edit = "0.22"
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Terminal output
+colored = "2"
+
+# GitHub API
+octocrab = "0.43"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "2"
+
+[dev-dependencies]
+tempfile = "3"
+assert_cmd = "2"
+predicates = "3"
