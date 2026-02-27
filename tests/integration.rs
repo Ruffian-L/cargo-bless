@@ -25,15 +25,16 @@ fn test_bless_reports_deps() {
         .stdout(predicate::str::contains("Found"));
 }
 
-/// Running with --fix should print a not-yet-implemented message but still exit 0.
+/// Running with --fix --dry-run should analyze and show fix preview.
 #[test]
-fn test_fix_mode_not_yet_implemented() {
+fn test_fix_dry_run() {
     cargo_bless_cmd()
         .arg("--fix")
+        .arg("--dry-run")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Fix mode"))
-        .stdout(predicate::str::contains("not yet implemented"));
+        .stdout(predicate::str::contains("Dry-run mode"))
+        .stdout(predicate::str::contains("Modernization report"));
 }
 
 /// Running with --help should print usage information.

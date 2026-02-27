@@ -21,8 +21,6 @@ fn main() -> Result<()> {
                     println!("🔧 Fix mode — applying safe changes");
                 }
                 println!();
-                println!("⚠️  Fix mode not yet implemented — coming in Phase 4.");
-                return Ok(());
             }
 
             println!("📋 Scanning dependencies...");
@@ -124,6 +122,16 @@ fn main() -> Result<()> {
                 &suggestions,
                 &intel,
             );
+
+            // Apply fixes if --fix was passed
+            if opts.fix && !suggestions.is_empty() {
+                println!();
+                let manifest = opts
+                    .manifest_path
+                    .clone()
+                    .unwrap_or_else(|| std::path::PathBuf::from("Cargo.toml"));
+                cargo_bless::fix::apply(&suggestions, &manifest, opts.dry_run)?;
+            }
 
             Ok(())
         }
