@@ -1,0 +1,52 @@
+[
+  {
+    "pattern": "chrono",
+    "replacement": "time",
+    "kind": "ModernAlternative",
+    "reason": "Smaller footprint, faster compiles for UTC-only use",
+    "source": "blessed.rs",
+    "condition": "UTC-only usage"
+  },
+  {
+    "pattern": "lazy_static",
+    "replacement": "std::sync::LazyLock",
+    "kind": "StdReplacement",
+    "reason": "Stable since Rust 1.80 — zero extra dependencies",
+    "source": "std docs"
+  },
+  {
+    "pattern": "structopt",
+    "replacement": "clap v4 (derive)",
+    "kind": "ModernAlternative",
+    "reason": "Fully integrated and actively maintained",
+    "source": "blessed.rs"
+  },
+  {
+    "pattern": "actix-web",
+    "replacement": "axum",
+    "kind": "ModernAlternative",
+    "reason": "Lightweight, Tokio-native, ergonomic",
+    "source": "blessed.rs"
+  },
+  {
+    "pattern": "memmap",
+    "replacement": "memmap2",
+    "kind": "Unmaintained",
+    "reason": "Original crate unmaintained — memmap2 is the maintained fork",
+    "source": "RustSec"
+  },
+  {
+    "pattern": "reqwest+serde_json",
+    "replacement": "reqwest with \"json\" feature",
+    "kind": "FeatureOptimization",
+    "reason": "Built-in deserialization, one fewer dependency",
+    "source": "reqwest docs"
+  },
+  {
+    "pattern": "tokio+async-std",
+    "replacement": "tokio only",
+    "kind": "ComboWin",
+    "reason": "Dominant runtime ecosystem — no need for two runtimes",
+    "source": "blessed.rs"
+  }
+]
