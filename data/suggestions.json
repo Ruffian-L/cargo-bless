@@ -76,5 +76,19 @@
     "kind": "ComboWin",
     "reason": "Dominant runtime ecosystem — no need for two runtimes",
     "source": "blessed.rs"
+  },
+  {
+    "pattern": "env_logger",
+    "replacement": "tracing-subscriber",
+    "kind": "ModernAlternative",
+    "reason": "Pairs with tracing — structured, filterable, async-aware logging",
+    "source": "blessed.rs"
+  },
+  {
+    "pattern": "log+env_logger",
+    "replacement": "tracing + tracing-subscriber",
+    "kind": "ComboWin",
+    "reason": "Full modern observability stack — structured spans + subscriber",
+    "source": "blessed.rs"
   }
 ]
