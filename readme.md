@@ -21,7 +21,7 @@ cargo install cargo-bless
 From source:
 
 ```sh
-git clone https://github.com/yourname/cargo-bless
+git clone https://github.com/Ruffian-L/cargo-bless
 cd cargo-bless
 cargo install --path .
 ```

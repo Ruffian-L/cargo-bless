@@ -14,3 +14,7 @@ Thumbs.db
 
 # Cache
 .cache/
+
+# Internal planning docs (not for public reviewers)
+plan.md
+tipsforai.md

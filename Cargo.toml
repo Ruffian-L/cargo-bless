@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.80"
 description = "Modernize your Rust dependencies with blessed.rs + live intel"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/cargo-bless"
+repository = "https://github.com/Ruffian-L/cargo-bless"
 keywords = ["cargo", "dependencies", "modernize", "blessed", "lint"]
 categories = ["development-tools::cargo-plugins"]
 
