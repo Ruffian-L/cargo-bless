@@ -14,6 +14,13 @@ fn main() -> Result<()> {
             println!("🔥 cargo-bless v{}", env!("CARGO_PKG_VERSION"));
             println!();
 
+            // Handle --update-rules before the main pipeline
+            if opts.update_rules {
+                cargo_bless::updater::update_rules()?;
+                println!();
+                println!("Rules updated. Run `cargo bless` to use them.");
+                return Ok(());
+            }
             if opts.fix {
                 if opts.dry_run {
                     println!("🔍 Dry-run mode — previewing changes (no files will be modified)");

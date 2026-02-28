@@ -75,10 +75,37 @@ fn impact_for(kind: &SuggestionKind) -> Impact {
     }
 }
 
-/// Load the built-in suggestion rules from the embedded JSON database.
+/// Load suggestion rules, merging cached blessed.rs rules with the embedded fallback.
+///
+/// If `~/.cache/cargo-bless/blessed-rules.json` exists and is fresh,
+/// those rules take priority. Any embedded rules whose patterns are NOT
+/// covered by the blessed.rs set are appended (preserves hand-crafted
+/// combo rules and custom additions).
 pub fn load_rules() -> Vec<Rule> {
-    let json = include_str!("../data/suggestions.json");
-    serde_json::from_str(json).expect("embedded suggestions.json should be valid")
+    let embedded: Vec<Rule> = {
+        let json = include_str!("../data/suggestions.json");
+        serde_json::from_str(json).expect("embedded suggestions.json should be valid")
+    };
+
+    // Try loading cached blessed.rs rules
+    let cached = crate::updater::load_cached_rules();
+
+    match cached {
+        Some(mut blessed_rules) => {
+            // Merge: blessed.rs rules first, then append embedded-only rules
+            let blessed_patterns: std::collections::HashSet<String> =
+                blessed_rules.iter().map(|r| r.pattern.clone()).collect();
+
+            for rule in embedded {
+                if !blessed_patterns.contains(&rule.pattern) {
+                    blessed_rules.push(rule);
+                }
+            }
+
+            blessed_rules
+        }
+        None => embedded,
+    }
 }
 
 /// Analyze resolved dependencies against the rule database.
@@ -129,7 +156,7 @@ mod tests {
     #[test]
     fn test_load_rules() {
         let rules = load_rules();
-        assert_eq!(rules.len(), 15, "should load all 15 starter rules");
+        assert!(rules.len() >= 15, "should load at least 15 rules, got {}", rules.len());
 
         // Spot-check a known rule
         let lazy = rules.iter().find(|r| r.pattern == "lazy_static").unwrap();

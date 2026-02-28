@@ -32,6 +32,7 @@ cargo install --path .
 cargo bless                  # scan and report
 cargo bless --fix --dry-run  # preview changes without writing
 cargo bless --fix            # apply changes (creates .bak backup)
+cargo bless --update-rules   # fetch latest rules from blessed.rs
 ```
 
 ## Example
