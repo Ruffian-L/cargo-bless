@@ -19,7 +19,11 @@ pub struct ResolvedDep {
 
 impl fmt::Display for ResolvedDep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let tag = if self.is_direct { "direct" } else { "transitive" };
+        let tag = if self.is_direct {
+            "direct"
+        } else {
+            "transitive"
+        };
         write!(f, "{} v{} ({})", self.name, self.version, tag)?;
         if !self.features.is_empty() {
             write!(f, " [{}]", self.features.join(", "))?;
@@ -28,13 +32,18 @@ impl fmt::Display for ResolvedDep {
     }
 }
 
-/// Get the root project's name and version from Cargo metadata.
-pub fn get_project_info(manifest_path: Option<&Path>) -> Result<(String, String)> {
+/// Run `cargo metadata` once and return the result.
+pub fn get_metadata(manifest_path: Option<&Path>) -> Result<cargo_metadata::Metadata> {
     let mut cmd = MetadataCommand::new();
+    cmd.features(CargoOpt::AllFeatures);
     if let Some(path) = manifest_path {
         cmd.manifest_path(path);
     }
-    let metadata = cmd.exec()?;
+    Ok(cmd.exec()?)
+}
+
+/// Get the root project's name and version from Cargo metadata.
+pub fn get_project_info(metadata: &cargo_metadata::Metadata) -> Result<(String, String)> {
     let root_id = metadata
         .resolve
         .as_ref()
@@ -48,17 +57,8 @@ pub fn get_project_info(manifest_path: Option<&Path>) -> Result<(String, String)
     Ok((root_pkg.name.to_string(), root_pkg.version.to_string()))
 }
 
-/// Parse the dependency tree for the project at `manifest_path`.
-/// If `manifest_path` is None, uses the current directory.
-pub fn get_deps(manifest_path: Option<&Path>) -> Result<Vec<ResolvedDep>> {
-    let mut cmd = MetadataCommand::new();
-    cmd.features(CargoOpt::AllFeatures);
-
-    if let Some(path) = manifest_path {
-        cmd.manifest_path(path);
-    }
-
-    let metadata = cmd.exec()?;
+/// Parse the dependency tree from an already-resolved metadata.
+pub fn get_deps(metadata: &cargo_metadata::Metadata) -> Result<Vec<ResolvedDep>> {
     let resolve = metadata
         .resolve
         .as_ref()
@@ -150,7 +150,8 @@ mod tests {
     #[test]
     fn test_get_deps_self() {
         // Parse our own Cargo.toml as a self-test
-        let deps = get_deps(None).expect("should parse own project");
+        let metadata = get_metadata(None).expect("should get metadata");
+        let deps = get_deps(&metadata).expect("should parse own project");
         assert!(!deps.is_empty(), "should find at least one dependency");
 
         // We know clap and serde are direct deps

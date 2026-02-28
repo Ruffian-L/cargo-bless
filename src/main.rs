@@ -33,11 +33,11 @@ fn main() -> Result<()> {
             println!("📋 Scanning dependencies...");
             println!();
 
-            // Parse the dep tree
+            // Parse the dep tree (single metadata call)
             let manifest = opts.manifest_path.as_deref();
-            let deps = cargo_bless::parser::get_deps(manifest)?;
-            let (project_name, project_version) =
-                cargo_bless::parser::get_project_info(manifest)?;
+            let metadata = cargo_bless::parser::get_metadata(manifest)?;
+            let deps = cargo_bless::parser::get_deps(&metadata)?;
+            let (project_name, project_version) = cargo_bless::parser::get_project_info(&metadata)?;
 
             let direct: Vec<_> = deps.iter().filter(|d| d.is_direct).collect();
             let transitive: Vec<_> = deps.iter().filter(|d| !d.is_direct).collect();
@@ -71,12 +71,7 @@ fn main() -> Result<()> {
             println!();
             println!(
                 "{}",
-                format!(
-                    "Found {} direct deps, {} total.",
-                    direct.len(),
-                    deps.len()
-                )
-                .bold()
+                format!("Found {} direct deps, {} total.", direct.len(), deps.len()).bold()
             );
 
             // Suggestion engine: load rules → analyze
@@ -90,6 +85,8 @@ fn main() -> Result<()> {
                 let crate_names: Vec<&str> = suggestions
                     .iter()
                     .flat_map(|s| s.current.split('+'))
+                    .collect::<std::collections::HashSet<_>>()
+                    .into_iter()
                     .collect();
 
                 match cargo_bless::intel::IntelClient::new() {

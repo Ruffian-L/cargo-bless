@@ -29,18 +29,13 @@ pub struct FixResult {
 /// - Creates a `.bak` backup before any edits.
 /// - Uses `toml_edit` to preserve comments and formatting.
 /// - If `dry_run` is true, prints the diff but writes nothing.
-pub fn apply(
-    suggestions: &[Suggestion],
-    manifest_path: &Path,
-    dry_run: bool,
-) -> Result<FixResult> {
+pub fn apply(suggestions: &[Suggestion], manifest_path: &Path, dry_run: bool) -> Result<FixResult> {
     let fixable: Vec<&Suggestion> = suggestions.iter().filter(|s| s.is_auto_fixable()).collect();
 
     if fixable.is_empty() {
         println!(
             "{}",
-            "ℹ️  No auto-fixable suggestions found. Manual changes recommended above."
-                .dimmed()
+            "ℹ️  No auto-fixable suggestions found. Manual changes recommended above.".dimmed()
         );
         return Ok(FixResult {
             applied: vec![],
@@ -70,14 +65,20 @@ pub fn apply(
     // Also note non-fixable suggestions as skipped
     for suggestion in suggestions {
         if !suggestion.is_auto_fixable() {
-            skipped.push(format!("{} (requires source code changes)", suggestion.current));
+            skipped.push(format!(
+                "{} (requires source code changes)",
+                suggestion.current
+            ));
         }
     }
 
     let edited = doc.to_string();
 
     if dry_run {
-        println!("🔍 {}", "Dry-run: the following changes would be made:".bold());
+        println!(
+            "🔍 {}",
+            "Dry-run: the following changes would be made:".bold()
+        );
         println!();
         print_diff(&original, &edited);
 
@@ -99,12 +100,8 @@ pub fn apply(
     } else {
         // Create backup
         let backup_path = manifest_path.with_extension("toml.bak");
-        fs::copy(manifest_path, &backup_path).with_context(|| {
-            format!(
-                "failed to create backup at {}",
-                backup_path.display()
-            )
-        })?;
+        fs::copy(manifest_path, &backup_path)
+            .with_context(|| format!("failed to create backup at {}", backup_path.display()))?;
         println!(
             "📋 Backup saved to {}",
             backup_path.display().to_string().dimmed()
@@ -118,11 +115,7 @@ pub fn apply(
         println!("{}", "📦 Running cargo update...".dimmed());
         let status = Command::new("cargo")
             .arg("update")
-            .current_dir(
-                manifest_path
-                    .parent()
-                    .unwrap_or_else(|| Path::new(".")),
-            )
+            .current_dir(manifest_path.parent().unwrap_or_else(|| Path::new(".")))
             .status();
 
         match status {
@@ -167,9 +160,15 @@ pub fn apply(
 /// Returns a description of what was done on success.
 fn apply_single(doc: &mut DocumentMut, suggestion: &Suggestion) -> Result<String> {
     match suggestion.kind {
-        SuggestionKind::StdReplacement => apply_remove(doc, &suggestion.current, &suggestion.recommended),
-        SuggestionKind::Unmaintained => apply_rename(doc, &suggestion.current, &suggestion.recommended),
-        SuggestionKind::FeatureOptimization => apply_feature_opt(doc, &suggestion.current, &suggestion.recommended),
+        SuggestionKind::StdReplacement => {
+            apply_remove(doc, &suggestion.current, &suggestion.recommended)
+        }
+        SuggestionKind::Unmaintained => {
+            apply_rename(doc, &suggestion.current, &suggestion.recommended)
+        }
+        SuggestionKind::FeatureOptimization => {
+            apply_feature_opt(doc, &suggestion.current, &suggestion.recommended)
+        }
         _ => anyhow::bail!("not auto-fixable"),
     }
 }
@@ -197,6 +196,14 @@ fn apply_rename(doc: &mut DocumentMut, old_name: &str, new_name: &str) -> Result
         .get_mut("dependencies")
         .and_then(|d| d.as_table_like_mut())
         .ok_or_else(|| anyhow::anyhow!("no [dependencies] table found"))?;
+
+    // Guard: refuse to overwrite an existing dependency
+    if deps.get(new_name).is_some() {
+        anyhow::bail!(
+            "`{}` already exists in [dependencies]; refusing to overwrite during rename",
+            new_name
+        );
+    }
 
     // Get the old entry's value
     let old_item = deps
@@ -229,13 +236,14 @@ fn apply_feature_opt(doc: &mut DocumentMut, pattern: &str, recommended: &str) ->
         .and_then(|d| d.as_table_like_mut())
         .ok_or_else(|| anyhow::anyhow!("no [dependencies] table found"))?;
 
-    // Remove the extra crate
-    if deps.remove(extra_crate).is_none() {
+    // Validate the extra crate exists first (before any mutation)
+    if deps.get(extra_crate).is_none() {
         anyhow::bail!("`{}` not found in [dependencies]", extra_crate);
     }
 
-    // Add the feature to the main crate
+    // Add the feature to the main crate first; only remove extra dep after success
     add_feature_to_dep(deps, main_crate, &feature_name)?;
+    deps.remove(extra_crate);
 
     Ok(format!(
         "Removed `{}`, enabled `{}` feature on `{}`",
@@ -421,9 +429,12 @@ reqwest = "0.12"
 serde_json = "1.0"
 "#;
         let mut doc: DocumentMut = toml.parse().unwrap();
-        let result =
-            apply_feature_opt(&mut doc, "reqwest+serde_json", r#"reqwest with "json" feature"#)
-                .unwrap();
+        let result = apply_feature_opt(
+            &mut doc,
+            "reqwest+serde_json",
+            r#"reqwest with "json" feature"#,
+        )
+        .unwrap();
 
         assert!(result.contains("Removed `serde_json`"));
         assert!(result.contains("enabled `json` feature on `reqwest`"));
@@ -445,9 +456,12 @@ reqwest = { version = "0.12", features = ["blocking"] }
 serde_json = "1.0"
 "#;
         let mut doc: DocumentMut = toml.parse().unwrap();
-        let result =
-            apply_feature_opt(&mut doc, "reqwest+serde_json", r#"reqwest with "json" feature"#)
-                .unwrap();
+        let result = apply_feature_opt(
+            &mut doc,
+            "reqwest+serde_json",
+            r#"reqwest with "json" feature"#,
+        )
+        .unwrap();
 
         assert!(result.contains("Removed `serde_json`"));
         let edited = doc.to_string();

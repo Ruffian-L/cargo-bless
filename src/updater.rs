@@ -86,9 +86,7 @@ pub fn update_rules() -> Result<Vec<Rule>> {
         .send()
         .context("failed to fetch blessed.rs data")?;
 
-    let data: BlessedData = response
-        .json()
-        .context("failed to parse blessed.rs JSON")?;
+    let data: BlessedData = response.json().context("failed to parse blessed.rs JSON")?;
 
     let rules = convert_to_rules(&data);
     println!("✅ Generated {} rules from blessed.rs", rules.len());
@@ -247,9 +245,19 @@ fn build_reason(purpose_notes: &str, alt_notes: &str, purpose_name: &str) -> Str
     let clean = strip_html(note);
 
     if clean.is_empty() {
-        format!("blessed.rs recommends a different crate for: {}", purpose_name)
+        format!(
+            "blessed.rs recommends a different crate for: {}",
+            purpose_name
+        )
     } else if clean.len() > 120 {
-        format!("{}...", &clean[..117])
+        // Find a safe truncation point at a char boundary
+        let truncate_at = clean
+            .char_indices()
+            .take_while(|(i, _)| *i < 117)
+            .last()
+            .map(|(i, c)| i + c.len_utf8())
+            .unwrap_or(0);
+        format!("{}...", &clean[..truncate_at])
     } else {
         clean
     }
@@ -374,9 +382,18 @@ mod tests {
                         name: "Arrays".into(),
                         notes: None,
                         recommendations: vec![
-                            Recommendation { name: "arrayvec".into(), notes: None },
-                            Recommendation { name: "smallvec".into(), notes: None },
-                            Recommendation { name: "tinyvec".into(), notes: None },
+                            Recommendation {
+                                name: "arrayvec".into(),
+                                notes: None,
+                            },
+                            Recommendation {
+                                name: "smallvec".into(),
+                                notes: None,
+                            },
+                            Recommendation {
+                                name: "tinyvec".into(),
+                                notes: None,
+                            },
                         ],
                     }],
                 }],
@@ -384,7 +401,10 @@ mod tests {
         };
 
         let rules = convert_to_rules(&data);
-        assert!(rules.is_empty(), "co-equal options without migration signals should not generate rules");
+        assert!(
+            rules.is_empty(),
+            "co-equal options without migration signals should not generate rules"
+        );
     }
 
     #[test]
@@ -398,8 +418,14 @@ mod tests {
                         name: "Logging".into(),
                         notes: None,
                         recommendations: vec![
-                            Recommendation { name: "tracing".into(), notes: Some("The modern choice".into()) },
-                            Recommendation { name: "log".into(), notes: Some("An older and simpler crate".into()) },
+                            Recommendation {
+                                name: "tracing".into(),
+                                notes: Some("The modern choice".into()),
+                            },
+                            Recommendation {
+                                name: "log".into(),
+                                notes: Some("An older and simpler crate".into()),
+                            },
                         ],
                     }],
                 }],
@@ -417,10 +443,17 @@ mod tests {
     #[ignore]
     fn test_live_update() {
         let rules = update_rules().expect("should fetch and convert");
-        assert!(rules.len() > 5, "should generate migration rules, got {}", rules.len());
+        assert!(
+            rules.len() > 5,
+            "should generate migration rules, got {}",
+            rules.len()
+        );
         println!("Generated {} rules from live blessed.rs", rules.len());
         for rule in &rules {
-            println!("  {} → {} ({})", rule.pattern, rule.replacement, rule.reason);
+            println!(
+                "  {} → {} ({})",
+                rule.pattern, rule.replacement, rule.reason
+            );
         }
     }
 }

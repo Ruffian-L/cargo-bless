@@ -121,4 +121,4 @@ Network calls are non-fatal — if you're offline, the rule-based report still w
 
 ## License
 
-Licensed under the [MIT license](LICENSE-MIT).
+Licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE) at your option.

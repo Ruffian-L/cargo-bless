@@ -13,7 +13,7 @@ use anyhow::{Context, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
-const USER_AGENT: &str = "cargo-bless/0.1.0 (https://github.com/cargo-bless/cargo-bless)";
+const USER_AGENT: &str = "cargo-bless/0.1.0 (https://github.com/Ruffian-L/cargo-bless)";
 const CACHE_TTL_SECS: u64 = 3600; // 1 hour
 
 // ── Public types ─────────────────────────────────────────────────────
@@ -187,12 +187,11 @@ impl IntelClient {
 pub fn parse_github_url(url: &str) -> Option<(String, String)> {
     let url = url.trim().trim_end_matches('/');
 
-    // Find the github.com part
-    let after_github = if let Some(pos) = url.find("github.com/") {
-        &url[pos + "github.com/".len()..]
-    } else {
-        return None;
-    };
+    // Accept only known GitHub URL forms
+    let after_github = url
+        .strip_prefix("https://github.com/")
+        .or_else(|| url.strip_prefix("http://github.com/"))
+        .or_else(|| url.strip_prefix("git@github.com:"))?;
 
     let parts: Vec<&str> = after_github.splitn(3, '/').collect();
     if parts.len() < 2 {
