@@ -81,11 +81,15 @@ fn impact_for(kind: &SuggestionKind) -> Impact {
 /// those rules take priority. Any embedded rules whose patterns are NOT
 /// covered by the blessed.rs set are appended (preserves hand-crafted
 /// combo rules and custom additions).
+/// Load only the embedded rules from `data/suggestions.json`, bypassing the cache.
+/// Used in tests to ensure deterministic assertions against the bundled rule set.
+pub fn load_embedded_rules() -> Vec<Rule> {
+    let json = include_str!("../data/suggestions.json");
+    serde_json::from_str(json).expect("embedded suggestions.json should be valid")
+}
+
 pub fn load_rules() -> Vec<Rule> {
-    let embedded: Vec<Rule> = {
-        let json = include_str!("../data/suggestions.json");
-        serde_json::from_str(json).expect("embedded suggestions.json should be valid")
-    };
+    let embedded = load_embedded_rules();
 
     // Try loading cached blessed.rs rules
     let cached = crate::updater::load_cached_rules();
@@ -155,7 +159,8 @@ mod tests {
 
     #[test]
     fn test_load_rules() {
-        let rules = load_rules();
+        // Use embedded rules to avoid cache interference
+        let rules = load_embedded_rules();
         assert!(rules.len() >= 15, "should load at least 15 rules, got {}", rules.len());
 
         // Spot-check a known rule
@@ -166,7 +171,8 @@ mod tests {
 
     #[test]
     fn test_analyze_single_crate_match() {
-        let rules = load_rules();
+        // Use embedded rules to avoid cache interference
+        let rules = load_embedded_rules();
         let deps = vec![
             ResolvedDep {
                 name: "lazy_static".into(),
