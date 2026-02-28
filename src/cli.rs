@@ -24,6 +24,10 @@ pub struct BlessOpts {
     #[arg(long)]
     pub dry_run: bool,
 
+    /// Fetch the latest rules from blessed.rs and update the local cache.
+    #[arg(long)]
+    pub update_rules: bool,
+
     /// Enable LLM-powered suggestions via local Ollama or API.
     #[arg(long)]
     pub llm: bool,
