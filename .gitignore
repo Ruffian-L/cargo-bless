@@ -14,3 +14,8 @@ Thumbs.db
 
 # Cache
 .cache/
+
+# AI planning / notes
+plan.md
+readme.md
+tipsforai.md
