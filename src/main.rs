@@ -21,6 +21,13 @@ fn main() -> Result<()> {
                 println!("Rules updated. Run `cargo bless` to use them.");
                 return Ok(());
             }
+            if opts.llm {
+                println!(
+                    "{}",
+                    "LLM-powered suggestions are not yet implemented. Stay tuned!".yellow()
+                );
+                println!();
+            }
             if opts.fix {
                 if opts.dry_run {
                     println!("🔍 Dry-run mode — previewing changes (no files will be modified)");
@@ -36,8 +43,7 @@ fn main() -> Result<()> {
             // Parse the dep tree
             let manifest = opts.manifest_path.as_deref();
             let deps = cargo_bless::parser::get_deps(manifest)?;
-            let (project_name, project_version) =
-                cargo_bless::parser::get_project_info(manifest)?;
+            let (project_name, project_version) = cargo_bless::parser::get_project_info(manifest)?;
 
             let direct: Vec<_> = deps.iter().filter(|d| d.is_direct).collect();
             let transitive: Vec<_> = deps.iter().filter(|d| !d.is_direct).collect();
@@ -71,12 +77,7 @@ fn main() -> Result<()> {
             println!();
             println!(
                 "{}",
-                format!(
-                    "Found {} direct deps, {} total.",
-                    direct.len(),
-                    deps.len()
-                )
-                .bold()
+                format!("Found {} direct deps, {} total.", direct.len(), deps.len()).bold()
             );
 
             // Suggestion engine: load rules → analyze

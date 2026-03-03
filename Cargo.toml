@@ -5,13 +5,20 @@ edition = "2021"
 rust-version = "1.80"
 description = "Modernize your Rust dependencies with blessed.rs + live intel"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/cargo-bless"
+repository = "https://github.com/Ruffian-L/cargo-bless"
+homepage = "https://github.com/Ruffian-L/cargo-bless"
+readme = "README.md"
 keywords = ["cargo", "dependencies", "modernize", "blessed", "lint"]
 categories = ["development-tools::cargo-plugins"]
+exclude = ["plan.md", "tipsforai.md", ".github/"]
 
 [[bin]]
 name = "cargo-bless"
 path = "src/main.rs"
+
+[[bin]]
+name = "update-suggestions"
+path = "src/bin/update_suggestions.rs"
 
 [dependencies]
 # CLI
@@ -27,7 +34,7 @@ crates_io_api = "0.12"
 toml_edit = "0.22"
 
 # HTTP client
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["blocking", "json"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

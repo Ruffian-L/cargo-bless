@@ -1,6 +1,6 @@
 //! Live intelligence layer — fetches metadata from crates.io and GitHub
 //! to assess freshness, popularity, and maintenance status.
-//! 
+//!
 //! All network operations are **non-fatal**: failures are logged and the
 //! tool continues with whatever data it has.
 
@@ -13,7 +13,7 @@ use anyhow::{Context, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
-const USER_AGENT: &str = "cargo-bless/0.1.0 (https://github.com/cargo-bless/cargo-bless)";
+const USER_AGENT: &str = "cargo-bless/0.1.0 (https://github.com/Ruffian-L/cargo-bless)";
 const CACHE_TTL_SECS: u64 = 3600; // 1 hour
 
 // ── Public types ─────────────────────────────────────────────────────
@@ -143,9 +143,7 @@ impl IntelClient {
         // Use a small tokio runtime for the async octocrab call
         let rt = tokio::runtime::Runtime::new().ok()?;
         rt.block_on(async {
-            let octo = octocrab::Octocrab::builder()
-                .build()
-                .ok()?;
+            let octo = octocrab::Octocrab::builder().build().ok()?;
 
             let repo_info = octo.repos(&owner, &repo).get().await.ok()?;
 
@@ -200,9 +198,7 @@ pub fn parse_github_url(url: &str) -> Option<(String, String)> {
     }
 
     let owner = parts[0].to_string();
-    let repo = parts[1]
-        .trim_end_matches(".git")
-        .to_string();
+    let repo = parts[1].trim_end_matches(".git").to_string();
 
     if owner.is_empty() || repo.is_empty() {
         return None;
@@ -318,10 +314,15 @@ mod tests {
     #[ignore]
     fn test_live_fetch_serde() {
         let client = IntelClient::new().expect("client should init");
-        let intel = client.fetch_crate_intel("serde").expect("should fetch serde");
+        let intel = client
+            .fetch_crate_intel("serde")
+            .expect("should fetch serde");
         assert_eq!(intel.name, "serde");
         assert!(intel.downloads > 0);
-        println!("serde: v{}, {} downloads", intel.latest_version, intel.downloads);
+        println!(
+            "serde: v{}, {} downloads",
+            intel.latest_version, intel.downloads
+        );
     }
 
     /// Live GitHub test — run with `cargo test -- --ignored`
@@ -333,6 +334,9 @@ mod tests {
             .fetch_github_activity("https://github.com/serde-rs/serde")
             .expect("should get activity");
         assert!(activity.stars > 0);
-        println!("serde: {} stars, archived={}", activity.stars, activity.is_archived);
+        println!(
+            "serde: {} stars, archived={}",
+            activity.stars, activity.is_archived
+        );
     }
 }
