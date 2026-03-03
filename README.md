@@ -12,7 +12,7 @@ A Cargo subcommand that checks your dependencies against [blessed.rs](https://bl
 
 ## Installation
 
-From crates.io (once published):
+From crates.io:
 
 ```sh
 cargo install cargo-bless
@@ -21,7 +21,7 @@ cargo install cargo-bless
 From source:
 
 ```sh
-git clone https://github.com/yourname/cargo-bless
+git clone https://github.com/Ruffian-L/cargo-bless
 cd cargo-bless
 cargo install --path .
 ```
