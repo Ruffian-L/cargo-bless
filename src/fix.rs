@@ -364,7 +364,7 @@ mod tests {
             impact: match kind {
                 SuggestionKind::Unmaintained | SuggestionKind::StdReplacement => Impact::High,
                 SuggestionKind::ModernAlternative | SuggestionKind::ComboWin => Impact::Medium,
-                SuggestionKind::FeatureOptimization => Impact::Low,
+                SuggestionKind::FeatureOptimization | SuggestionKind::FeatureOptimizationManual => Impact::Low,
             },
         }
     }

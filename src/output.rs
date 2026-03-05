@@ -35,7 +35,7 @@ pub fn render_report(
     for suggestion in suggestions {
         let icon = match suggestion.kind {
             SuggestionKind::ModernAlternative => "•",
-            SuggestionKind::FeatureOptimization => "•",
+            SuggestionKind::FeatureOptimization | SuggestionKind::FeatureOptimizationManual => "⚙️ ",
             SuggestionKind::StdReplacement => "•",
             SuggestionKind::ComboWin => "•",
             SuggestionKind::Unmaintained => "⚠️",

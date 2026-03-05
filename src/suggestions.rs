@@ -44,6 +44,8 @@ pub enum SuggestionKind {
     ComboWin,
     /// Crate is unmaintained — switch to maintained fork/successor.
     Unmaintained,
+    /// Enable a built-in feature to drop a separate dependency (manual action required).
+    FeatureOptimizationManual,
 }
 
 /// Impact level of a suggestion.
@@ -71,7 +73,7 @@ fn impact_for(kind: &SuggestionKind) -> Impact {
     match kind {
         SuggestionKind::Unmaintained | SuggestionKind::StdReplacement => Impact::High,
         SuggestionKind::ModernAlternative | SuggestionKind::ComboWin => Impact::Medium,
-        SuggestionKind::FeatureOptimization => Impact::Low,
+        SuggestionKind::FeatureOptimization | SuggestionKind::FeatureOptimizationManual => Impact::Low,
     }
 }
 
@@ -127,6 +129,8 @@ pub fn analyze(manifest_path: Option<&Path>, deps: &[ResolvedDep], rules: &[Rule
     let mut suggestions = Vec::new();
 
     for rule in rules {
+        let mut suggestion_kind = rule.kind.clone();
+
         let matched = if rule.pattern.contains('+') {
             // Combo rule: all named crates must be present
             let all_present = rule.pattern
@@ -136,13 +140,13 @@ pub fn analyze(manifest_path: Option<&Path>, deps: &[ResolvedDep], rules: &[Rule
             if all_present {
                 // For FeatureOptimization combo rules (like `reqwest+serde_json`),
                 // check if the second crate is actually used directly in the codebase.
-                // If it is, we shouldn't recommend dropping it.
+                // If it is, we emit it as a manual, non-auto-fixable suggestion.
                 if rule.kind == SuggestionKind::FeatureOptimization {
                     let parts: Vec<&str> = rule.pattern.split('+').collect();
                     if parts.len() == 2 {
                         let extra_crate = parts[1].trim();
                         if is_crate_used_in_source(manifest_path, extra_crate) {
-                            continue;
+                            suggestion_kind = SuggestionKind::FeatureOptimizationManual;
                         }
                     }
                 }
@@ -157,12 +161,16 @@ pub fn analyze(manifest_path: Option<&Path>, deps: &[ResolvedDep], rules: &[Rule
 
         if matched {
             suggestions.push(Suggestion {
-                kind: rule.kind.clone(),
+                kind: suggestion_kind.clone(),
                 current: rule.pattern.clone(),
                 recommended: rule.replacement.clone(),
-                reason: rule.reason.clone(),
+                reason: if suggestion_kind == SuggestionKind::FeatureOptimizationManual {
+                    format!("{} (Note: crate is still used in source, manual update required)", rule.reason)
+                } else {
+                    rule.reason.clone()
+                },
                 source: rule.source.clone(),
-                impact: impact_for(&rule.kind),
+                impact: impact_for(&suggestion_kind),
             });
         }
     }
@@ -425,5 +433,6 @@ mod tests {
         assert_eq!(impact_for(&SuggestionKind::ModernAlternative), Impact::Medium);
         assert_eq!(impact_for(&SuggestionKind::ComboWin), Impact::Medium);
         assert_eq!(impact_for(&SuggestionKind::FeatureOptimization), Impact::Low);
+        assert_eq!(impact_for(&SuggestionKind::FeatureOptimizationManual), Impact::Low);
     }
 }
