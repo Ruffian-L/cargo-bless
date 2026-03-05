@@ -369,7 +369,7 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_dep() {
+    fn test_remove_dep() -> Result<()> {
         let toml = r#"
 [package]
 name = "test-project"
@@ -379,17 +379,18 @@ version = "0.1.0"
 lazy_static = "1.5"
 serde = "1.0"
 "#;
-        let mut doc: DocumentMut = toml.parse().unwrap();
-        let result = apply_remove(&mut doc, "lazy_static", "std::sync::LazyLock").unwrap();
+        let mut doc: DocumentMut = toml.parse()?;
+        let result = apply_remove(&mut doc, "lazy_static", "std::sync::LazyLock")?;
 
         assert!(result.contains("Removed `lazy_static`"));
         let edited = doc.to_string();
         assert!(!edited.contains("lazy_static"));
         assert!(edited.contains("serde")); // other deps untouched
+        Ok(())
     }
 
     #[test]
-    fn test_rename_dep() {
+    fn test_rename_dep() -> Result<()> {
         let toml = r#"
 [package]
 name = "test-project"
@@ -399,18 +400,19 @@ version = "0.1.0"
 memmap = "0.7"
 serde = "1.0"
 "#;
-        let mut doc: DocumentMut = toml.parse().unwrap();
-        let result = apply_rename(&mut doc, "memmap", "memmap2").unwrap();
+        let mut doc: DocumentMut = toml.parse()?;
+        let result = apply_rename(&mut doc, "memmap", "memmap2")?;
 
         assert!(result.contains("Renamed `memmap` → `memmap2`"));
         let edited = doc.to_string();
         assert!(!edited.contains("memmap ="));
         assert!(edited.contains("memmap2"));
         assert!(edited.contains("serde")); // other deps untouched
+        Ok(())
     }
 
     #[test]
-    fn test_feature_opt_simple_version() {
+    fn test_feature_opt_simple_version() -> Result<()> {
         let toml = r#"
 [package]
 name = "test-project"
@@ -420,10 +422,10 @@ version = "0.1.0"
 reqwest = "0.12"
 serde_json = "1.0"
 "#;
-        let mut doc: DocumentMut = toml.parse().unwrap();
+        let mut doc: DocumentMut = toml.parse()?;
         let result =
             apply_feature_opt(&mut doc, "reqwest+serde_json", r#"reqwest with "json" feature"#)
-                .unwrap();
+                ?;
 
         assert!(result.contains("Removed `serde_json`"));
         assert!(result.contains("enabled `json` feature on `reqwest`"));
@@ -431,10 +433,11 @@ serde_json = "1.0"
         assert!(!edited.contains("serde_json"));
         assert!(edited.contains("json"));
         assert!(edited.contains("reqwest"));
+        Ok(())
     }
 
     #[test]
-    fn test_feature_opt_inline_table() {
+    fn test_feature_opt_inline_table() -> Result<()> {
         let toml = r#"
 [package]
 name = "test-project"
@@ -444,10 +447,10 @@ version = "0.1.0"
 reqwest = { version = "0.12", features = ["blocking"] }
 serde_json = "1.0"
 "#;
-        let mut doc: DocumentMut = toml.parse().unwrap();
+        let mut doc: DocumentMut = toml.parse()?;
         let result =
             apply_feature_opt(&mut doc, "reqwest+serde_json", r#"reqwest with "json" feature"#)
-                .unwrap();
+                ?;
 
         assert!(result.contains("Removed `serde_json`"));
         let edited = doc.to_string();
@@ -455,10 +458,11 @@ serde_json = "1.0"
         // Should have both blocking and json features
         assert!(edited.contains("blocking"));
         assert!(edited.contains("json"));
+        Ok(())
     }
 
     #[test]
-    fn test_extract_feature_name() {
+    fn test_extract_feature_name() -> Result<()> {
         assert_eq!(
             extract_feature_name(r#"reqwest with "json" feature"#),
             Some("json".into())
@@ -468,10 +472,11 @@ serde_json = "1.0"
             Some("full".into())
         );
         assert_eq!(extract_feature_name("no quotes here"), None);
+        Ok(())
     }
 
     #[test]
-    fn test_remove_nonexistent_dep() {
+    fn test_remove_nonexistent_dep() -> Result<()> {
         let toml = r#"
 [package]
 name = "test-project"
@@ -479,14 +484,15 @@ name = "test-project"
 [dependencies]
 serde = "1.0"
 "#;
-        let mut doc: DocumentMut = toml.parse().unwrap();
+        let mut doc: DocumentMut = toml.parse()?;
         let result = apply_remove(&mut doc, "nonexistent", "something");
         assert!(result.is_err());
+        Ok(())
     }
 
     #[test]
-    fn test_dry_run_does_not_write() {
-        let tmp = TempDir::new().unwrap();
+    fn test_dry_run_does_not_write() -> Result<()> {
+        let tmp = TempDir::new()?;
         let manifest = tmp.path().join("Cargo.toml");
         let toml_content = r#"
 [package]
@@ -496,7 +502,7 @@ version = "0.1.0"
 [dependencies]
 lazy_static = "1.5"
 "#;
-        fs::write(&manifest, toml_content).unwrap();
+        fs::write(&manifest, toml_content)?;
 
         let suggestions = vec![make_suggestion(
             SuggestionKind::StdReplacement,
@@ -504,20 +510,21 @@ lazy_static = "1.5"
             "std::sync::LazyLock",
         )];
 
-        let result = apply(&suggestions, &manifest, true).unwrap();
+        let result = apply(&suggestions, &manifest, true)?;
         assert_eq!(result.applied.len(), 1);
 
         // File should be unchanged
-        let after = fs::read_to_string(&manifest).unwrap();
+        let after = fs::read_to_string(&manifest)?;
         assert_eq!(after, toml_content);
 
         // No backup should exist
         assert!(!tmp.path().join("Cargo.toml.bak").exists());
+        Ok(())
     }
 
     #[test]
-    fn test_full_apply_creates_backup() {
-        let tmp = TempDir::new().unwrap();
+    fn test_full_apply_creates_backup() -> Result<()> {
+        let tmp = TempDir::new()?;
         let manifest = tmp.path().join("Cargo.toml");
         let toml_content = r#"[package]
 name = "test-project"
@@ -527,7 +534,7 @@ version = "0.1.0"
 lazy_static = "1.5"
 serde = "1.0"
 "#;
-        fs::write(&manifest, toml_content).unwrap();
+        fs::write(&manifest, toml_content)?;
 
         let suggestions = vec![make_suggestion(
             SuggestionKind::StdReplacement,
@@ -535,26 +542,27 @@ serde = "1.0"
             "std::sync::LazyLock",
         )];
 
-        let result = apply(&suggestions, &manifest, false).unwrap();
+        let result = apply(&suggestions, &manifest, false)?;
         assert_eq!(result.applied.len(), 1);
 
         // Backup should exist with original content
         let backup = tmp.path().join("Cargo.toml.bak");
         assert!(backup.exists());
-        let backup_content = fs::read_to_string(&backup).unwrap();
+        let backup_content = fs::read_to_string(&backup)?;
         assert_eq!(backup_content, toml_content);
 
         // File should be modified
-        let after = fs::read_to_string(&manifest).unwrap();
+        let after = fs::read_to_string(&manifest)?;
         assert!(!after.contains("lazy_static"));
         assert!(after.contains("serde")); // untouched
+        Ok(())
     }
 
     #[test]
-    fn test_no_fixable_suggestions() {
-        let tmp = TempDir::new().unwrap();
+    fn test_no_fixable_suggestions() -> Result<()> {
+        let tmp = TempDir::new()?;
         let manifest = tmp.path().join("Cargo.toml");
-        fs::write(&manifest, "[package]\nname = \"test\"\n[dependencies]\n").unwrap();
+        fs::write(&manifest, "[package]\nname = \"test\"\n[dependencies]\n")?;
 
         let suggestions = vec![make_suggestion(
             SuggestionKind::ModernAlternative,
@@ -562,8 +570,9 @@ serde = "1.0"
             "clap v4",
         )];
 
-        let result = apply(&suggestions, &manifest, true).unwrap();
+        let result = apply(&suggestions, &manifest, true)?;
         assert!(result.applied.is_empty());
         assert_eq!(result.skipped.len(), 1);
+        Ok(())
     }
 }
