@@ -156,7 +156,11 @@ mod tests {
     #[test]
     fn test_load_rules() {
         let rules = load_rules();
-        assert!(rules.len() >= 15, "should load at least 15 rules, got {}", rules.len());
+        assert!(
+            rules.len() >= 15,
+            "should load at least 15 rules, got {}",
+            rules.len()
+        );
 
         // Spot-check a known rule
         let lazy = rules.iter().find(|r| r.pattern == "lazy_static").unwrap();
@@ -218,7 +222,10 @@ mod tests {
         let suggestions = analyze(&deps, &rules);
         assert_eq!(suggestions.len(), 1);
         assert_eq!(suggestions[0].current, "reqwest+serde_json");
-        assert!(matches!(suggestions[0].kind, SuggestionKind::FeatureOptimization));
+        assert!(matches!(
+            suggestions[0].kind,
+            SuggestionKind::FeatureOptimization
+        ));
         assert_eq!(suggestions[0].impact, Impact::Low);
     }
 
@@ -324,15 +331,24 @@ mod tests {
         ];
 
         let suggestions = analyze(&deps, &rules);
-        assert!(suggestions.is_empty(), "modern deps should not trigger any suggestions");
+        assert!(
+            suggestions.is_empty(),
+            "modern deps should not trigger any suggestions"
+        );
     }
 
     #[test]
     fn test_impact_derivation() {
         assert_eq!(impact_for(&SuggestionKind::Unmaintained), Impact::High);
         assert_eq!(impact_for(&SuggestionKind::StdReplacement), Impact::High);
-        assert_eq!(impact_for(&SuggestionKind::ModernAlternative), Impact::Medium);
+        assert_eq!(
+            impact_for(&SuggestionKind::ModernAlternative),
+            Impact::Medium
+        );
         assert_eq!(impact_for(&SuggestionKind::ComboWin), Impact::Medium);
-        assert_eq!(impact_for(&SuggestionKind::FeatureOptimization), Impact::Low);
+        assert_eq!(
+            impact_for(&SuggestionKind::FeatureOptimization),
+            Impact::Low
+        );
     }
 }
