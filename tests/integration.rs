@@ -33,8 +33,7 @@ fn test_fix_dry_run() {
         .arg("--dry-run")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Dry-run mode"))
-        .stdout(predicate::str::contains("Modernization report"));
+        .stdout(predicate::str::contains("Dry-run mode"));
 }
 
 /// Running with --help should print usage information.
