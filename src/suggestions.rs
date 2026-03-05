@@ -335,4 +335,25 @@ mod tests {
         assert_eq!(impact_for(&SuggestionKind::ComboWin), Impact::Medium);
         assert_eq!(impact_for(&SuggestionKind::FeatureOptimization), Impact::Low);
     }
+
+    #[test]
+    fn test_is_auto_fixable() {
+        let make_suggestion = |kind| Suggestion {
+            kind,
+            current: "dummy".into(),
+            recommended: "dummy".into(),
+            reason: "dummy".into(),
+            source: "dummy".into(),
+            impact: Impact::Low,
+        };
+
+        // Fixable
+        assert!(make_suggestion(SuggestionKind::StdReplacement).is_auto_fixable());
+        assert!(make_suggestion(SuggestionKind::Unmaintained).is_auto_fixable());
+        assert!(make_suggestion(SuggestionKind::FeatureOptimization).is_auto_fixable());
+
+        // Advisory only
+        assert!(!make_suggestion(SuggestionKind::ModernAlternative).is_auto_fixable());
+        assert!(!make_suggestion(SuggestionKind::ComboWin).is_auto_fixable());
+    }
 }
