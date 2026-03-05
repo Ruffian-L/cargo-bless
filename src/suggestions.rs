@@ -20,13 +20,11 @@ pub struct Suggestion {
 
 impl Suggestion {
     /// Whether this suggestion can be auto-applied by editing Cargo.toml only.
-    /// ModernAlternative and ComboWin require source code changes, so they stay advisory.
+    /// ModernAlternative, ComboWin, and FeatureOptimization require source code changes, so they stay advisory.
     pub fn is_auto_fixable(&self) -> bool {
         matches!(
             self.kind,
-            SuggestionKind::StdReplacement
-                | SuggestionKind::Unmaintained
-                | SuggestionKind::FeatureOptimization
+            SuggestionKind::StdReplacement | SuggestionKind::Unmaintained
         )
     }
 }
