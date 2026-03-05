@@ -26,7 +26,6 @@ impl Suggestion {
             self.kind,
             SuggestionKind::StdReplacement
                 | SuggestionKind::Unmaintained
-                | SuggestionKind::FeatureOptimization
         )
     }
 }

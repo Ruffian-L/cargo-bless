@@ -5,7 +5,7 @@
 //! - `.bak` backup before any writes  
 //! - `--dry-run` previews the diff without touching files
 //! - Only direct dependency edits (never transitive)
-//! - Only auto-fixable suggestion types (StdReplacement, Unmaintained, FeatureOptimization)
+//! - Only auto-fixable suggestion types (StdReplacement, Unmaintained)
 
 use std::fs;
 use std::path::Path;
@@ -13,7 +13,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 use colored::*;
-use toml_edit::{DocumentMut, Item, Value};
+use toml_edit::DocumentMut;
 
 use crate::suggestions::{Suggestion, SuggestionKind};
 
@@ -121,6 +121,7 @@ pub fn apply(
             .current_dir(
                 manifest_path
                     .parent()
+                    .filter(|p| !p.as_os_str().is_empty())
                     .unwrap_or_else(|| Path::new(".")),
             )
             .status();
@@ -169,7 +170,8 @@ fn apply_single(doc: &mut DocumentMut, suggestion: &Suggestion) -> Result<String
     match suggestion.kind {
         SuggestionKind::StdReplacement => apply_remove(doc, &suggestion.current, &suggestion.recommended),
         SuggestionKind::Unmaintained => apply_rename(doc, &suggestion.current, &suggestion.recommended),
-        SuggestionKind::FeatureOptimization => apply_feature_opt(doc, &suggestion.current, &suggestion.recommended),
+        // FeatureOptimization was removed from being auto-fixable because it breaks projects
+        // that still directly use the removed crate elsewhere.
         _ => anyhow::bail!("not auto-fixable"),
     }
 }
@@ -207,107 +209,6 @@ fn apply_rename(doc: &mut DocumentMut, old_name: &str, new_name: &str) -> Result
     deps.insert(new_name, old_item);
 
     Ok(format!("Renamed `{}` → `{}`", old_name, new_name))
-}
-
-/// Feature optimization: remove extra dep, add feature to the main dep.
-/// Pattern format: "main_crate+extra_crate" → "main_crate with \"feature\" feature"
-fn apply_feature_opt(doc: &mut DocumentMut, pattern: &str, recommended: &str) -> Result<String> {
-    let parts: Vec<&str> = pattern.split('+').collect();
-    if parts.len() != 2 {
-        anyhow::bail!("expected pattern format 'crate1+crate2', got '{}'", pattern);
-    }
-
-    let main_crate = parts[0].trim();
-    let extra_crate = parts[1].trim();
-
-    // Parse the feature name from recommended text (e.g. 'reqwest with "json" feature')
-    let feature_name = extract_feature_name(recommended)
-        .ok_or_else(|| anyhow::anyhow!("could not parse feature name from '{}'", recommended))?;
-
-    let deps = doc
-        .get_mut("dependencies")
-        .and_then(|d| d.as_table_like_mut())
-        .ok_or_else(|| anyhow::anyhow!("no [dependencies] table found"))?;
-
-    // Remove the extra crate
-    if deps.remove(extra_crate).is_none() {
-        anyhow::bail!("`{}` not found in [dependencies]", extra_crate);
-    }
-
-    // Add the feature to the main crate
-    add_feature_to_dep(deps, main_crate, &feature_name)?;
-
-    Ok(format!(
-        "Removed `{}`, enabled `{}` feature on `{}`",
-        extra_crate, feature_name, main_crate
-    ))
-}
-
-/// Extract feature name from a recommendation string like 'reqwest with "json" feature'.
-fn extract_feature_name(recommended: &str) -> Option<String> {
-    // Look for text in quotes
-    let start = recommended.find('"')? + 1;
-    let end = recommended[start..].find('"')? + start;
-    Some(recommended[start..end].to_string())
-}
-
-/// Add a feature to an existing dependency entry.
-fn add_feature_to_dep(
-    deps: &mut dyn toml_edit::TableLike,
-    crate_name: &str,
-    feature: &str,
-) -> Result<()> {
-    let entry = deps
-        .get_mut(crate_name)
-        .ok_or_else(|| anyhow::anyhow!("`{}` not found in [dependencies]", crate_name))?;
-
-    match entry {
-        Item::Value(Value::String(version_str)) => {
-            // Simple string version like: reqwest = "0.12"
-            // Convert to table form: reqwest = { version = "0.12", features = ["json"] }
-            let version = version_str.value().clone();
-            let mut table = toml_edit::InlineTable::new();
-            table.insert("version", Value::from(version));
-            let mut features = toml_edit::Array::new();
-            features.push(feature);
-            table.insert("features", Value::Array(features));
-            *entry = Item::Value(Value::InlineTable(table));
-        }
-        Item::Value(Value::InlineTable(table)) => {
-            // Already an inline table like: reqwest = { version = "0.12", features = [...] }
-            if let Some(Value::Array(arr)) = table.get_mut("features") {
-                // Check if feature already exists
-                let has_feature = arr.iter().any(|v| v.as_str() == Some(feature));
-                if !has_feature {
-                    arr.push(feature);
-                }
-            } else {
-                let mut features = toml_edit::Array::new();
-                features.push(feature);
-                table.insert("features", Value::Array(features));
-            }
-        }
-        Item::Table(table) => {
-            // Full table form
-            if let Some(features_item) = table.get_mut("features") {
-                if let Item::Value(Value::Array(arr)) = features_item {
-                    let has_feature = arr.iter().any(|v| v.as_str() == Some(feature));
-                    if !has_feature {
-                        arr.push(feature);
-                    }
-                }
-            } else {
-                let mut features = toml_edit::Array::new();
-                features.push(feature);
-                table.insert("features", toml_edit::value(Value::Array(features)));
-            }
-        }
-        _ => {
-            anyhow::bail!("unexpected dependency format for `{}`", crate_name);
-        }
-    }
-
-    Ok(())
 }
 
 /// Print a simple line-by-line diff between old and new content.
@@ -407,67 +308,6 @@ serde = "1.0"
         assert!(!edited.contains("memmap ="));
         assert!(edited.contains("memmap2"));
         assert!(edited.contains("serde")); // other deps untouched
-    }
-
-    #[test]
-    fn test_feature_opt_simple_version() {
-        let toml = r#"
-[package]
-name = "test-project"
-version = "0.1.0"
-
-[dependencies]
-reqwest = "0.12"
-serde_json = "1.0"
-"#;
-        let mut doc: DocumentMut = toml.parse().unwrap();
-        let result =
-            apply_feature_opt(&mut doc, "reqwest+serde_json", r#"reqwest with "json" feature"#)
-                .unwrap();
-
-        assert!(result.contains("Removed `serde_json`"));
-        assert!(result.contains("enabled `json` feature on `reqwest`"));
-        let edited = doc.to_string();
-        assert!(!edited.contains("serde_json"));
-        assert!(edited.contains("json"));
-        assert!(edited.contains("reqwest"));
-    }
-
-    #[test]
-    fn test_feature_opt_inline_table() {
-        let toml = r#"
-[package]
-name = "test-project"
-version = "0.1.0"
-
-[dependencies]
-reqwest = { version = "0.12", features = ["blocking"] }
-serde_json = "1.0"
-"#;
-        let mut doc: DocumentMut = toml.parse().unwrap();
-        let result =
-            apply_feature_opt(&mut doc, "reqwest+serde_json", r#"reqwest with "json" feature"#)
-                .unwrap();
-
-        assert!(result.contains("Removed `serde_json`"));
-        let edited = doc.to_string();
-        assert!(!edited.contains("serde_json"));
-        // Should have both blocking and json features
-        assert!(edited.contains("blocking"));
-        assert!(edited.contains("json"));
-    }
-
-    #[test]
-    fn test_extract_feature_name() {
-        assert_eq!(
-            extract_feature_name(r#"reqwest with "json" feature"#),
-            Some("json".into())
-        );
-        assert_eq!(
-            extract_feature_name(r#"tokio with "full" feature"#),
-            Some("full".into())
-        );
-        assert_eq!(extract_feature_name("no quotes here"), None);
     }
 
     #[test]
