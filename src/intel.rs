@@ -75,16 +75,32 @@ pub struct IntelClient {
 impl IntelClient {
     /// Create a new IntelClient with crates.io API access and disk cache.
     pub fn new() -> Result<Self> {
+        // Read an environment variable to allow tests to override the cache directory
+        // and avoid polluting the real system cache.
+        let base_dir = std::env::var_os("CARGO_BLESS_TEST_CACHE_DIR")
+            .map(PathBuf::from);
+
+        let cache_dir = if let Some(base) = base_dir {
+            let mut path = base.clone();
+            path.push("cargo-bless");
+            path
+        } else {
+            ProjectDirs::from("rs", "", "cargo-bless")
+                .map(|dirs| dirs.cache_dir().to_path_buf())
+                .unwrap_or_else(|| {
+                    let mut fallback = std::env::temp_dir();
+                    fallback.push("cargo-bless-cache");
+                    fallback
+                })
+        };
+
+        Self::with_cache_dir(cache_dir)
+    }
+
+    /// Internal constructor that allows injecting a specific cache directory.
+    fn with_cache_dir(cache_dir: PathBuf) -> Result<Self> {
         let client = crates_io_api::SyncClient::new(USER_AGENT, Duration::from_secs(1))
             .context("failed to create crates.io client")?;
-
-        let cache_dir = ProjectDirs::from("rs", "", "cargo-bless")
-            .map(|dirs| dirs.cache_dir().to_path_buf())
-            .unwrap_or_else(|| {
-                let mut fallback = std::env::temp_dir();
-                fallback.push("cargo-bless-cache");
-                fallback
-            });
 
         fs::create_dir_all(&cache_dir).context("failed to create cache directory")?;
 
@@ -211,6 +227,52 @@ pub fn parse_github_url(url: &str) -> Option<(String, String)> {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+    use std::env;
+    use std::sync::Mutex;
+
+    // Mutex to ensure tests that modify environment variables don't run concurrently
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
+
+    struct EnvGuard {
+        var: &'static str,
+        old_val: Option<std::ffi::OsString>,
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            if let Some(ref v) = self.old_val {
+                env::set_var(self.var, v);
+            } else {
+                env::remove_var(self.var);
+            }
+        }
+    }
+
+    #[test]
+    fn test_intel_client_new_creates_cache_dir() {
+        let _lock = ENV_MUTEX.lock().unwrap();
+        let temp = TempDir::new().unwrap();
+        let temp_path = temp.path();
+
+        // Save old env var and set up drop guard
+        let _env_guard = EnvGuard {
+            var: "CARGO_BLESS_TEST_CACHE_DIR",
+            old_val: env::var_os("CARGO_BLESS_TEST_CACHE_DIR"),
+        };
+
+        // Set to temp dir so IntelClient resolves here
+        env::set_var("CARGO_BLESS_TEST_CACHE_DIR", temp_path);
+
+        // Run
+        let client = IntelClient::new().expect("should create client");
+
+        // Verify standard directory
+        assert!(client.cache_dir.starts_with(temp_path));
+        assert!(client.cache_dir.exists());
+
+        // Also verify the directory name contains "cargo-bless" (cross-platform safe)
+        assert!(client.cache_dir.to_string_lossy().contains("cargo-bless"));
+    }
 
     #[test]
     fn test_parse_github_url_basic() {
