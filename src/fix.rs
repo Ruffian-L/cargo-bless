@@ -29,18 +29,13 @@ pub struct FixResult {
 /// - Creates a `.bak` backup before any edits.
 /// - Uses `toml_edit` to preserve comments and formatting.
 /// - If `dry_run` is true, prints the diff but writes nothing.
-pub fn apply(
-    suggestions: &[Suggestion],
-    manifest_path: &Path,
-    dry_run: bool,
-) -> Result<FixResult> {
+pub fn apply(suggestions: &[Suggestion], manifest_path: &Path, dry_run: bool) -> Result<FixResult> {
     let fixable: Vec<&Suggestion> = suggestions.iter().filter(|s| s.is_auto_fixable()).collect();
 
     if fixable.is_empty() {
         println!(
             "{}",
-            "ℹ️  No auto-fixable suggestions found. Manual changes recommended above."
-                .dimmed()
+            "ℹ️  No auto-fixable suggestions found. Manual changes recommended above.".dimmed()
         );
         return Ok(FixResult {
             applied: vec![],
@@ -70,14 +65,20 @@ pub fn apply(
     // Also note non-fixable suggestions as skipped
     for suggestion in suggestions {
         if !suggestion.is_auto_fixable() {
-            skipped.push(format!("{} (requires source code changes)", suggestion.current));
+            skipped.push(format!(
+                "{} (requires source code changes)",
+                suggestion.current
+            ));
         }
     }
 
     let edited = doc.to_string();
 
     if dry_run {
-        println!("🔍 {}", "Dry-run: the following changes would be made:".bold());
+        println!(
+            "🔍 {}",
+            "Dry-run: the following changes would be made:".bold()
+        );
         println!();
         print_diff(&original, &edited);
 
@@ -99,12 +100,8 @@ pub fn apply(
     } else {
         // Create backup
         let backup_path = manifest_path.with_extension("toml.bak");
-        fs::copy(manifest_path, &backup_path).with_context(|| {
-            format!(
-                "failed to create backup at {}",
-                backup_path.display()
-            )
-        })?;
+        fs::copy(manifest_path, &backup_path)
+            .with_context(|| format!("failed to create backup at {}", backup_path.display()))?;
         println!(
             "📋 Backup saved to {}",
             backup_path.display().to_string().dimmed()
@@ -168,9 +165,15 @@ pub fn apply(
 /// Returns a description of what was done on success.
 fn apply_single(doc: &mut DocumentMut, suggestion: &Suggestion) -> Result<String> {
     match suggestion.kind {
-        SuggestionKind::StdReplacement => apply_remove(doc, &suggestion.current, &suggestion.recommended),
-        SuggestionKind::Unmaintained => apply_rename(doc, &suggestion.current, &suggestion.recommended),
-        SuggestionKind::FeatureOptimization => apply_feature_opt(doc, &suggestion.current, &suggestion.recommended),
+        SuggestionKind::StdReplacement => {
+            apply_remove(doc, &suggestion.current, &suggestion.recommended)
+        }
+        SuggestionKind::Unmaintained => {
+            apply_rename(doc, &suggestion.current, &suggestion.recommended)
+        }
+        SuggestionKind::FeatureOptimization => {
+            apply_feature_opt(doc, &suggestion.current, &suggestion.recommended)
+        }
         _ => anyhow::bail!("not auto-fixable"),
     }
 }
@@ -422,9 +425,12 @@ reqwest = "0.12"
 serde_json = "1.0"
 "#;
         let mut doc: DocumentMut = toml.parse().unwrap();
-        let result =
-            apply_feature_opt(&mut doc, "reqwest+serde_json", r#"reqwest with "json" feature"#)
-                .unwrap();
+        let result = apply_feature_opt(
+            &mut doc,
+            "reqwest+serde_json",
+            r#"reqwest with "json" feature"#,
+        )
+        .unwrap();
 
         assert!(result.contains("Removed `serde_json`"));
         assert!(result.contains("enabled `json` feature on `reqwest`"));
@@ -446,9 +452,12 @@ reqwest = { version = "0.12", features = ["blocking"] }
 serde_json = "1.0"
 "#;
         let mut doc: DocumentMut = toml.parse().unwrap();
-        let result =
-            apply_feature_opt(&mut doc, "reqwest+serde_json", r#"reqwest with "json" feature"#)
-                .unwrap();
+        let result = apply_feature_opt(
+            &mut doc,
+            "reqwest+serde_json",
+            r#"reqwest with "json" feature"#,
+        )
+        .unwrap();
 
         assert!(result.contains("Removed `serde_json`"));
         let edited = doc.to_string();
