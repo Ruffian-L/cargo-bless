@@ -2,7 +2,7 @@
 //! using `toml_edit` to preserve comments and formatting.
 //!
 //! Safety guardrails:
-//! - `.bak` backup before any writes  
+//! - `.bak` backup before any writes
 //! - `--dry-run` previews the diff without touching files
 //! - Only direct dependency edits (never transitive)
 //! - Only auto-fixable suggestion types (StdReplacement, Unmaintained, FeatureOptimization)
@@ -116,10 +116,7 @@ pub fn apply(
 
         // Run cargo update
         println!("{}", "📦 Running cargo update...".dimmed());
-
-        let cargo_bin = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
-
-        let status = Command::new(&cargo_bin)
+        let status = Command::new("cargo")
             .arg("update")
             .current_dir(
                 manifest_path
