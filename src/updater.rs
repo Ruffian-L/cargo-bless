@@ -94,22 +94,23 @@ pub fn update_rules() -> Result<Vec<Rule>> {
     println!("✅ Generated {} rules from blessed.rs", rules.len());
 
     // Cache to disk
-    let cache_path = get_cache_path();
-    if let Some(parent) = cache_path.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
+    if let Some(cache_path) = get_cache_path() {
+        if let Some(parent) = cache_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
 
-    let cached = CachedRules {
-        rules: rules.clone(),
-        fetched_at: SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs(),
-    };
+        let cached = CachedRules {
+            rules: rules.clone(),
+            fetched_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+        };
 
-    if let Ok(json) = serde_json::to_string_pretty(&cached) {
-        let _ = fs::write(&cache_path, json);
-        println!("💾 Cached to {}", cache_path.display());
+        if let Ok(json) = serde_json::to_string_pretty(&cached) {
+            let _ = fs::write(&cache_path, json);
+            println!("💾 Cached to {}", cache_path.display());
+        }
     }
 
     Ok(rules)
@@ -117,7 +118,7 @@ pub fn update_rules() -> Result<Vec<Rule>> {
 
 /// Load cached blessed.rs rules if they exist and are fresh.
 pub fn load_cached_rules() -> Option<Vec<Rule>> {
-    let cache_path = get_cache_path();
+    let cache_path = get_cache_path()?;
     let contents = fs::read_to_string(&cache_path).ok()?;
     let cached: CachedRules = serde_json::from_str(&contents).ok()?;
 
@@ -129,15 +130,9 @@ pub fn load_cached_rules() -> Option<Vec<Rule>> {
 }
 
 /// Get the cache file path.
-fn get_cache_path() -> PathBuf {
+fn get_cache_path() -> Option<PathBuf> {
     ProjectDirs::from("rs", "", "cargo-bless")
         .map(|dirs| dirs.cache_dir().join("blessed-rules.json"))
-        .unwrap_or_else(|| {
-            let mut p = std::env::temp_dir();
-            p.push("cargo-bless-cache");
-            p.push("blessed-rules.json");
-            p
-        })
 }
 
 // ── Converter ────────────────────────────────────────────────────────
