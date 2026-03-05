@@ -19,7 +19,11 @@ pub struct ResolvedDep {
 
 impl fmt::Display for ResolvedDep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let tag = if self.is_direct { "direct" } else { "transitive" };
+        let tag = if self.is_direct {
+            "direct"
+        } else {
+            "transitive"
+        };
         write!(f, "{} v{} ({})", self.name, self.version, tag)?;
         if !self.features.is_empty() {
             write!(f, " [{}]", self.features.join(", "))?;

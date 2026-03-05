@@ -64,7 +64,8 @@ pub fn render_report(
             if let Some(info) = intel.get(crate_name) {
                 let mut enrichment = format!("   latest: v{}", info.latest_version);
                 if let Some(recent) = info.recent_downloads {
-                    enrichment.push_str(&format!(", {} recent downloads", format_downloads(recent)));
+                    enrichment
+                        .push_str(&format!(", {} recent downloads", format_downloads(recent)));
                 }
                 println!("   {}", enrichment.dimmed());
             }
