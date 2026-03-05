@@ -78,11 +78,16 @@ impl IntelClient {
         let client = crates_io_api::SyncClient::new(USER_AGENT, Duration::from_secs(1))
             .context("failed to create crates.io client")?;
 
-        let cache_dir = ProjectDirs::from("rs", "", "cargo-bless")
+        let mut cache_dir = ProjectDirs::from("rs", "", "cargo-bless")
             .map(|dirs| dirs.cache_dir().to_path_buf());
 
         if let Some(dir) = &cache_dir {
-            fs::create_dir_all(dir).context("failed to create cache directory")?;
+            if let Err(e) = fs::create_dir_all(dir) {
+                // If we can't create the cache directory, just disable caching
+                // instead of failing the whole operation.
+                eprintln!("⚠️ Warning: Failed to create cache directory at {}: {}", dir.display(), e);
+                cache_dir = None;
+            }
         }
 
         Ok(Self { client, cache_dir })
