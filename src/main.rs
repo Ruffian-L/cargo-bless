@@ -136,7 +136,6 @@ fn main() -> Result<()> {
                 println!();
                 let manifest = opts
                     .manifest_path
-                    .clone()
                     .unwrap_or_else(|| std::path::PathBuf::from("Cargo.toml"));
                 cargo_bless::fix::apply(&suggestions, &manifest, opts.dry_run)?;
             }
