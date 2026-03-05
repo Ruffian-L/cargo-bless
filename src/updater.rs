@@ -86,30 +86,29 @@ pub fn update_rules() -> Result<Vec<Rule>> {
         .send()
         .context("failed to fetch blessed.rs data")?;
 
-    let data: BlessedData = response
-        .json()
-        .context("failed to parse blessed.rs JSON")?;
+    let data: BlessedData = response.json().context("failed to parse blessed.rs JSON")?;
 
     let rules = convert_to_rules(&data);
     println!("✅ Generated {} rules from blessed.rs", rules.len());
 
-    // Cache to disk
-    let cache_path = get_cache_path();
-    if let Some(parent) = cache_path.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
+    // Cache to disk if possible
+    if let Some(cache_path) = get_cache_path() {
+        if let Some(parent) = cache_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
 
-    let cached = CachedRules {
-        rules: rules.clone(),
-        fetched_at: SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs(),
-    };
+        let cached = CachedRules {
+            rules: rules.clone(),
+            fetched_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+        };
 
-    if let Ok(json) = serde_json::to_string_pretty(&cached) {
-        let _ = fs::write(&cache_path, json);
-        println!("💾 Cached to {}", cache_path.display());
+        if let Ok(json) = serde_json::to_string_pretty(&cached) {
+            let _ = fs::write(&cache_path, json);
+            println!("💾 Cached to {}", cache_path.display());
+        }
     }
 
     Ok(rules)
@@ -117,7 +116,7 @@ pub fn update_rules() -> Result<Vec<Rule>> {
 
 /// Load cached blessed.rs rules if they exist and are fresh.
 pub fn load_cached_rules() -> Option<Vec<Rule>> {
-    let cache_path = get_cache_path();
+    let cache_path = get_cache_path()?;
     let contents = fs::read_to_string(&cache_path).ok()?;
     let cached: CachedRules = serde_json::from_str(&contents).ok()?;
 
@@ -128,16 +127,10 @@ pub fn load_cached_rules() -> Option<Vec<Rule>> {
     }
 }
 
-/// Get the cache file path.
-fn get_cache_path() -> PathBuf {
+/// Get the cache file path. Returns None if a safe directory cannot be found.
+fn get_cache_path() -> Option<PathBuf> {
     ProjectDirs::from("rs", "", "cargo-bless")
         .map(|dirs| dirs.cache_dir().join("blessed-rules.json"))
-        .unwrap_or_else(|| {
-            let mut p = std::env::temp_dir();
-            p.push("cargo-bless-cache");
-            p.push("blessed-rules.json");
-            p
-        })
 }
 
 // ── Converter ────────────────────────────────────────────────────────
@@ -247,7 +240,10 @@ fn build_reason(purpose_notes: &str, alt_notes: &str, purpose_name: &str) -> Str
     let clean = strip_html(note);
 
     if clean.is_empty() {
-        format!("blessed.rs recommends a different crate for: {}", purpose_name)
+        format!(
+            "blessed.rs recommends a different crate for: {}",
+            purpose_name
+        )
     } else if clean.len() > 120 {
         format!("{}...", &clean[..117])
     } else {
@@ -374,9 +370,18 @@ mod tests {
                         name: "Arrays".into(),
                         notes: None,
                         recommendations: vec![
-                            Recommendation { name: "arrayvec".into(), notes: None },
-                            Recommendation { name: "smallvec".into(), notes: None },
-                            Recommendation { name: "tinyvec".into(), notes: None },
+                            Recommendation {
+                                name: "arrayvec".into(),
+                                notes: None,
+                            },
+                            Recommendation {
+                                name: "smallvec".into(),
+                                notes: None,
+                            },
+                            Recommendation {
+                                name: "tinyvec".into(),
+                                notes: None,
+                            },
                         ],
                     }],
                 }],
@@ -384,7 +389,10 @@ mod tests {
         };
 
         let rules = convert_to_rules(&data);
-        assert!(rules.is_empty(), "co-equal options without migration signals should not generate rules");
+        assert!(
+            rules.is_empty(),
+            "co-equal options without migration signals should not generate rules"
+        );
     }
 
     #[test]
@@ -398,8 +406,14 @@ mod tests {
                         name: "Logging".into(),
                         notes: None,
                         recommendations: vec![
-                            Recommendation { name: "tracing".into(), notes: Some("The modern choice".into()) },
-                            Recommendation { name: "log".into(), notes: Some("An older and simpler crate".into()) },
+                            Recommendation {
+                                name: "tracing".into(),
+                                notes: Some("The modern choice".into()),
+                            },
+                            Recommendation {
+                                name: "log".into(),
+                                notes: Some("An older and simpler crate".into()),
+                            },
                         ],
                     }],
                 }],
@@ -417,10 +431,17 @@ mod tests {
     #[ignore]
     fn test_live_update() {
         let rules = update_rules().expect("should fetch and convert");
-        assert!(rules.len() > 5, "should generate migration rules, got {}", rules.len());
+        assert!(
+            rules.len() > 5,
+            "should generate migration rules, got {}",
+            rules.len()
+        );
         println!("Generated {} rules from live blessed.rs", rules.len());
         for rule in &rules {
-            println!("  {} → {} ({})", rule.pattern, rule.replacement, rule.reason);
+            println!(
+                "  {} → {} ({})",
+                rule.pattern, rule.replacement, rule.reason
+            );
         }
     }
 }
