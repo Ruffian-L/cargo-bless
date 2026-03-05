@@ -121,6 +121,7 @@ pub fn apply(
             .current_dir(
                 manifest_path
                     .parent()
+                    .filter(|p| !p.as_os_str().is_empty())
                     .unwrap_or_else(|| Path::new(".")),
             )
             .status();
