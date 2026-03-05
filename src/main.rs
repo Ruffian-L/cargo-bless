@@ -83,7 +83,7 @@ fn main() -> Result<()> {
             // Suggestion engine: load rules → analyze
             println!();
             let rules = cargo_bless::suggestions::load_rules();
-            let suggestions = cargo_bless::suggestions::analyze(&deps, &rules);
+            let suggestions = cargo_bless::suggestions::analyze(manifest, &deps, &rules);
 
             // Live intelligence: fetch metadata for flagged deps (non-fatal)
             let intel = if !suggestions.is_empty() {
