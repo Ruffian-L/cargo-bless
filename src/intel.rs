@@ -316,6 +316,36 @@ mod tests {
         assert!(loaded.is_fresh());
     }
 
+    #[test]
+    fn test_fetch_bulk_intel() {
+        let tmp = TempDir::new().unwrap();
+
+        let mut client = IntelClient::new().unwrap();
+        client.cache_dir = Some(tmp.path().to_path_buf());
+
+        // Inject successful cache hit
+        let intel = CrateIntel {
+            name: "test_success".into(),
+            latest_version: "1.0.0".into(),
+            downloads: 100,
+            recent_downloads: None,
+            last_updated: "2026-02-27T00:00:00Z".into(),
+            repository_url: None,
+            description: None,
+        };
+        let entry = CacheEntry::new(intel.clone());
+        let json = serde_json::to_string_pretty(&entry).unwrap();
+        fs::write(tmp.path().join("test_success.json"), json).unwrap();
+
+        // Fetch one that succeeds and one that fails (cache miss and fake crate)
+        let results = client.fetch_bulk_intel(&["test_success", "test_failure_not_exist_abc123"]);
+
+        // Validate
+        assert_eq!(results.len(), 1);
+        assert!(results.contains_key("test_success"));
+        assert_eq!(results.get("test_success").unwrap().name, "test_success");
+    }
+
     /// Live network test — run with `cargo test -- --ignored`
     #[test]
     #[ignore]
