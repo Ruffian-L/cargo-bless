@@ -24,7 +24,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo check
-      - run: cargo clippy -- -D warnings
+      - run: cargo check --locked
+      - run: cargo clippy --locked -- -D warnings
         if: matrix.toolchain == 'stable'
-      - run: cargo test
+      - run: cargo test --locked
