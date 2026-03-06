@@ -310,6 +310,68 @@ mod tests {
     }
 
     #[test]
+    fn test_fetch_crate_intel_cache_hit() {
+        let tmp = TempDir::new().unwrap();
+        let mut client = IntelClient::new().unwrap();
+        client.cache_dir = tmp.path().to_path_buf();
+
+        let intel = CrateIntel {
+            name: "test_crate".into(),
+            latest_version: "1.0.0".into(),
+            downloads: 100,
+            recent_downloads: None,
+            last_updated: "2026-02-27T00:00:00Z".into(),
+            repository_url: None,
+            description: None,
+        };
+        let entry = CacheEntry::new(intel.clone());
+        let json = serde_json::to_string_pretty(&entry).unwrap();
+        fs::write(tmp.path().join("test_crate.json"), json).unwrap();
+
+        let result = client.fetch_crate_intel("test_crate").unwrap();
+        assert_eq!(result.name, "test_crate");
+        assert_eq!(result.latest_version, "1.0.0");
+    }
+
+    #[test]
+    fn test_fetch_crate_intel_cache_stale() {
+        let tmp = TempDir::new().unwrap();
+        let mut client = IntelClient::new().unwrap();
+        client.cache_dir = tmp.path().to_path_buf();
+
+        let intel = CrateIntel {
+            name: "test_failure_not_exist_abc123".into(),
+            latest_version: "1.0.0".into(),
+            downloads: 100,
+            recent_downloads: None,
+            last_updated: "2026-02-27T00:00:00Z".into(),
+            repository_url: None,
+            description: None,
+        };
+        let entry = CacheEntry {
+            data: intel,
+            fetched_at: 0, // stale
+        };
+        let json = serde_json::to_string_pretty(&entry).unwrap();
+        fs::write(tmp.path().join("test_failure_not_exist_abc123.json"), json).unwrap();
+
+        let result = client.fetch_crate_intel("test_failure_not_exist_abc123");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_fetch_crate_intel_invalid_cache() {
+        let tmp = TempDir::new().unwrap();
+        let mut client = IntelClient::new().unwrap();
+        client.cache_dir = tmp.path().to_path_buf();
+
+        fs::write(tmp.path().join("test_failure_not_exist_abc123.json"), "invalid json").unwrap();
+
+        let result = client.fetch_crate_intel("test_failure_not_exist_abc123");
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_fetch_bulk_intel() {
         let tmp = TempDir::new().unwrap();
 
