@@ -70,6 +70,7 @@ impl<T> CacheEntry<T> {
 pub struct IntelClient {
     client: crates_io_api::SyncClient,
     cache_dir: PathBuf,
+    github_api_url: Option<String>,
 }
 
 impl IntelClient {
@@ -88,7 +89,11 @@ impl IntelClient {
 
         fs::create_dir_all(&cache_dir).context("failed to create cache directory")?;
 
-        Ok(Self { client, cache_dir })
+        Ok(Self {
+            client,
+            cache_dir,
+            github_api_url: None,
+        })
     }
 
     /// Fetch live intel for a crate. Checks disk cache first (1hr TTL).
@@ -143,7 +148,11 @@ impl IntelClient {
         // Use a small tokio runtime for the async octocrab call
         let rt = tokio::runtime::Runtime::new().ok()?;
         rt.block_on(async {
-            let octo = octocrab::Octocrab::builder().build().ok()?;
+            let mut builder = octocrab::Octocrab::builder();
+            if let Some(ref url) = self.github_api_url {
+                builder = builder.base_uri(url).ok()?;
+            }
+            let octo = builder.build().ok()?;
 
             let repo_info = octo.repos(&owner, &repo).get().await.ok()?;
 
@@ -368,5 +377,93 @@ mod tests {
             "serde: {} stars, archived={}",
             activity.stars, activity.is_archived
         );
+    }
+
+    #[test]
+    fn test_fetch_github_activity_success() {
+        let mut server = mockito::Server::new();
+
+        let _m = server
+            .mock("GET", "/repos/owner/repo")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(
+                r#"{
+                "id": 12345,
+                "node_id": "MDEwOlJlcG9zaXRvcnkxMjM0NQ==",
+                "name": "repo",
+                "full_name": "owner/repo",
+                "private": false,
+                "owner": {
+                    "login": "owner",
+                    "id": 1,
+                    "node_id": "MDQ6VXNlcjE=",
+                    "avatar_url": "https://github.com/images/error/octocat_happy.gif",
+                    "gravatar_id": "",
+                    "url": "https://api.github.com/users/owner",
+                    "html_url": "https://github.com/owner",
+                    "followers_url": "https://api.github.com/users/owner/followers",
+                    "following_url": "https://api.github.com/users/owner/following{/other_user}",
+                    "gists_url": "https://api.github.com/users/owner/gists{/gist_id}",
+                    "starred_url": "https://api.github.com/users/owner/starred{/owner}{/repo}",
+                    "subscriptions_url": "https://api.github.com/users/owner/subscriptions",
+                    "organizations_url": "https://api.github.com/users/owner/orgs",
+                    "repos_url": "https://api.github.com/users/owner/repos",
+                    "events_url": "https://api.github.com/users/owner/events{/privacy}",
+                    "received_events_url": "https://api.github.com/users/owner/received_events",
+                    "type": "User",
+                    "site_admin": false
+                },
+                "html_url": "https://github.com/owner/repo",
+                "description": "This is a test repository",
+                "fork": false,
+                "url": "https://api.github.com/repos/owner/repo",
+                "pushed_at": "2024-01-01T00:00:00Z",
+                "created_at": "2023-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z",
+                "stargazers_count": 42,
+                "archived": false,
+                "open_issues_count": 5
+            }"#,
+            )
+            .create();
+
+        let mut client = IntelClient::new().unwrap();
+        client.github_api_url = Some(server.url());
+
+        let activity = client
+            .fetch_github_activity("https://github.com/owner/repo")
+            .expect("should get activity");
+
+        assert_eq!(activity.stars, 42);
+        assert_eq!(activity.is_archived, false);
+        assert_eq!(activity.open_issues, 5);
+        assert_eq!(activity.last_push, "2024-01-01T00:00:00+00:00");
+    }
+
+    #[test]
+    fn test_fetch_github_activity_not_found() {
+        let mut server = mockito::Server::new();
+
+        let _m = server
+            .mock("GET", "/repos/owner/repo")
+            .with_status(404)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"message": "Not Found"}"#)
+            .create();
+
+        let mut client = IntelClient::new().unwrap();
+        client.github_api_url = Some(server.url());
+
+        let activity = client.fetch_github_activity("https://github.com/owner/repo");
+        assert!(activity.is_none(), "expected None for 404 response");
+    }
+
+    #[test]
+    fn test_fetch_github_activity_invalid_url() {
+        let client = IntelClient::new().unwrap();
+        // invalid URL format for github
+        let activity = client.fetch_github_activity("https://example.com/not-github");
+        assert!(activity.is_none(), "expected None for invalid GitHub URL");
     }
 }
