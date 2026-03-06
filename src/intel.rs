@@ -75,6 +75,7 @@ pub struct IntelClient {
 impl IntelClient {
     /// Create a new IntelClient with crates.io API access and disk cache.
     pub fn new() -> Result<Self> {
+        // Use 1 req/sec rate limit per crates.io policy, but wait within threads.
         let client = crates_io_api::SyncClient::new(USER_AGENT, Duration::from_secs(1))
             .context("failed to create crates.io client")?;
 
@@ -162,18 +163,16 @@ impl IntelClient {
     /// Fetch intel for all unique crate names, returning what we can get.
     /// Failures for individual crates are silently skipped.
     pub fn fetch_bulk_intel(&self, crate_names: &[&str]) -> HashMap<String, CrateIntel> {
-        let mut intel = HashMap::new();
-        for name in crate_names {
-            match self.fetch_crate_intel(name) {
-                Ok(info) => {
-                    intel.insert(name.to_string(), info);
-                }
-                Err(_) => {
-                    // Non-fatal: skip this crate
-                }
-            }
-        }
-        intel
+        use rayon::prelude::*;
+
+        crate_names
+            .par_iter()
+            .filter_map(|&name| {
+                self.fetch_crate_intel(name)
+                    .ok()
+                    .map(|info| (name.to_string(), info))
+            })
+            .collect()
     }
 }
 
