@@ -252,18 +252,15 @@ fn test_fail_on_high_exits_nonzero() {
         return;
     }
 
-    // When --fail-on=high is wired, should exit non-zero for high-impact suggestions
     let output = Command::new(&bin)
-        .args(&["bless", "--offline", "--fail-on=high"])
+        .args(["bless", "--offline", "--fail-on=high"])
         .current_dir(&project_dir)
         .output()
         .expect("failed to execute cargo-bless");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    // If --fail-on is wired, exit code should be non-zero when high-impact suggestions exist
     if stdout.contains("--fail-on") || output.status.code() == Some(0) {
-        // Either stub warning shown, or flag not wired yet — test documents current state
         eprintln!("Note: --fail-on may not be fully wired yet (Phase 2)");
     } else {
         assert!(

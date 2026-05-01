@@ -115,12 +115,8 @@ pub fn apply(suggestions: &[Suggestion], manifest_path: &Path, dry_run: bool) ->
         println!("{}", "📦 Running cargo update...".dimmed());
         let status = Command::new("cargo")
             .arg("update")
-            .current_dir(
-                manifest_path
-                    .parent()
-                    .filter(|p| !p.as_os_str().is_empty())
-                    .unwrap_or_else(|| Path::new(".")),
-            )
+            .arg("--manifest-path")
+            .arg(manifest_path)
             .status();
 
         match status {
@@ -145,12 +141,8 @@ pub fn apply(suggestions: &[Suggestion], manifest_path: &Path, dry_run: bool) ->
         println!("{}", "🔍 Running cargo check...".dimmed());
         let check_status = Command::new("cargo")
             .arg("check")
-            .current_dir(
-                manifest_path
-                    .parent()
-                    .filter(|p| !p.as_os_str().is_empty())
-                    .unwrap_or_else(|| Path::new(".")),
-            )
+            .arg("--manifest-path")
+            .arg(manifest_path)
             .status();
 
         match check_status {

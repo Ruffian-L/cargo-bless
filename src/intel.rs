@@ -70,7 +70,7 @@ impl<T> CacheEntry<T> {
 pub struct IntelClient {
     client: crates_io_api::SyncClient,
     http: reqwest::blocking::Client,
-    cache_dir: PathBuf,
+    cache_dir: Option<PathBuf>,
 }
 
 impl IntelClient {
@@ -84,15 +84,20 @@ impl IntelClient {
             .build()
             .context("failed to create GitHub HTTP client")?;
 
-        let cache_dir = ProjectDirs::from("rs", "", "cargo-bless")
+        let mut cache_dir = ProjectDirs::from("rs", "", "cargo-bless")
             .map(|dirs| dirs.cache_dir().to_path_buf())
-            .unwrap_or_else(|| {
-                let mut fallback = std::env::temp_dir();
-                fallback.push("cargo-bless-cache");
-                fallback
-            });
+            .filter(|path| !path.as_os_str().is_empty());
 
-        fs::create_dir_all(&cache_dir).context("failed to create cache directory")?;
+        if let Some(dir) = &cache_dir {
+            if let Err(err) = fs::create_dir_all(dir) {
+                eprintln!(
+                    "⚠️  Could not create cache directory at {}: {}. Continuing without cache.",
+                    dir.display(),
+                    err
+                );
+                cache_dir = None;
+            }
+        }
 
         Ok(Self {
             client,
@@ -104,11 +109,17 @@ impl IntelClient {
     /// Fetch live intel for a crate. Checks disk cache first (1hr TTL).
     pub fn fetch_crate_intel(&self, name: &str) -> Result<CrateIntel> {
         // Check cache
-        let cache_path = self.cache_dir.join(format!("{}.json", name));
-        if let Ok(contents) = fs::read_to_string(&cache_path) {
-            if let Ok(entry) = serde_json::from_str::<CacheEntry<CrateIntel>>(&contents) {
-                if entry.is_fresh() {
-                    return Ok(entry.data);
+        let cache_path = self
+            .cache_dir
+            .as_ref()
+            .map(|dir| dir.join(format!("{}.json", name)));
+
+        if let Some(path) = &cache_path {
+            if let Ok(contents) = fs::read_to_string(path) {
+                if let Ok(entry) = serde_json::from_str::<CacheEntry<CrateIntel>>(&contents) {
+                    if entry.is_fresh() {
+                        return Ok(entry.data);
+                    }
                 }
             }
         }
@@ -137,9 +148,11 @@ impl IntelClient {
         };
 
         // Write to cache (best-effort)
-        let entry = CacheEntry::new(intel.clone());
-        if let Ok(json) = serde_json::to_string_pretty(&entry) {
-            let _ = fs::write(&cache_path, json);
+        if let Some(path) = &cache_path {
+            let entry = CacheEntry::new(intel.clone());
+            if let Ok(json) = serde_json::to_string_pretty(&entry) {
+                let _ = fs::write(path, json);
+            }
         }
 
         Ok(intel)
@@ -332,7 +345,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
 
         let mut client = IntelClient::new().unwrap();
-        client.cache_dir = tmp.path().to_path_buf();
+        client.cache_dir = Some(tmp.path().to_path_buf());
 
         // Inject successful cache hit
         let intel = CrateIntel {
