@@ -69,6 +69,7 @@ impl<T> CacheEntry<T> {
 /// Client for fetching live dependency intelligence.
 pub struct IntelClient {
     client: crates_io_api::SyncClient,
+    http: reqwest::blocking::Client,
     cache_dir: PathBuf,
 }
 
@@ -77,6 +78,11 @@ impl IntelClient {
     pub fn new() -> Result<Self> {
         let client = crates_io_api::SyncClient::new(USER_AGENT, Duration::from_secs(1))
             .context("failed to create crates.io client")?;
+        let http = reqwest::blocking::Client::builder()
+            .user_agent(USER_AGENT)
+            .timeout(Duration::from_secs(10))
+            .build()
+            .context("failed to create GitHub HTTP client")?;
 
         let cache_dir = ProjectDirs::from("rs", "", "cargo-bless")
             .map(|dirs| dirs.cache_dir().to_path_buf())
@@ -88,7 +94,11 @@ impl IntelClient {
 
         fs::create_dir_all(&cache_dir).context("failed to create cache directory")?;
 
-        Ok(Self { client, cache_dir })
+        Ok(Self {
+            client,
+            http,
+            cache_dir,
+        })
     }
 
     /// Fetch live intel for a crate. Checks disk cache first (1hr TTL).
@@ -121,7 +131,7 @@ impl IntelClient {
             latest_version,
             downloads: crate_data.downloads,
             recent_downloads: crate_data.recent_downloads,
-            last_updated: crate_data.updated_at.to_rfc3339(),
+            last_updated: crate_data.updated_at.to_string(),
             repository_url: crate_data.repository.clone(),
             description: crate_data.description.clone(),
         };
@@ -140,22 +150,22 @@ impl IntelClient {
     pub fn fetch_github_activity(&self, repo_url: &str) -> Option<GitHubActivity> {
         let (owner, repo) = parse_github_url(repo_url)?;
 
-        // Use a small tokio runtime for the async octocrab call
-        let rt = tokio::runtime::Runtime::new().ok()?;
-        rt.block_on(async {
-            let octo = octocrab::Octocrab::builder().build().ok()?;
+        let url = format!("https://api.github.com/repos/{owner}/{repo}");
+        let repo_info = self
+            .http
+            .get(url)
+            .send()
+            .ok()?
+            .error_for_status()
+            .ok()?
+            .json::<GitHubRepoResponse>()
+            .ok()?;
 
-            let repo_info = octo.repos(&owner, &repo).get().await.ok()?;
-
-            Some(GitHubActivity {
-                last_push: repo_info
-                    .pushed_at
-                    .map(|d| d.to_rfc3339())
-                    .unwrap_or_else(|| "unknown".into()),
-                stars: repo_info.stargazers_count.unwrap_or(0) as u64,
-                is_archived: repo_info.archived.unwrap_or(false),
-                open_issues: repo_info.open_issues_count.unwrap_or(0) as u64,
-            })
+        Some(GitHubActivity {
+            last_push: repo_info.pushed_at.unwrap_or_else(|| "unknown".into()),
+            stars: repo_info.stargazers_count.unwrap_or(0),
+            is_archived: repo_info.archived.unwrap_or(false),
+            open_issues: repo_info.open_issues_count.unwrap_or(0),
         })
     }
 
@@ -175,6 +185,14 @@ impl IntelClient {
         }
         intel
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubRepoResponse {
+    pushed_at: Option<String>,
+    stargazers_count: Option<u64>,
+    archived: Option<bool>,
+    open_issues_count: Option<u64>,
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────

@@ -1,0 +1,7 @@
+reviews:
+  commit_status: false
+  fail_commit_status: false
+  auto_review:
+    enabled: false
+    auto_incremental_review: false
+

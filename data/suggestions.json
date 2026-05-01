@@ -11,14 +11,14 @@
     "pattern": "lazy_static",
     "replacement": "std::sync::LazyLock",
     "kind": "StdReplacement",
-    "reason": "Stable since Rust 1.80 — zero extra dependencies",
+    "reason": "Stable since Rust 1.80 \u2014 zero extra dependencies",
     "source": "std docs"
   },
   {
     "pattern": "once_cell",
     "replacement": "std::sync::LazyLock / OnceLock",
     "kind": "StdReplacement",
-    "reason": "LazyLock and OnceLock stable since Rust 1.80 — zero extra dependencies",
+    "reason": "LazyLock and OnceLock stable since Rust 1.80 \u2014 zero extra dependencies",
     "source": "std docs"
   },
   {
@@ -39,28 +39,28 @@
     "pattern": "iron",
     "replacement": "axum",
     "kind": "Unmaintained",
-    "reason": "Iron is unmaintained — axum is the modern Tokio-native choice",
+    "reason": "Iron is unmaintained \u2014 axum is the modern Tokio-native choice",
     "source": "blessed.rs"
   },
   {
     "pattern": "memmap",
     "replacement": "memmap2",
     "kind": "Unmaintained",
-    "reason": "Original crate unmaintained — memmap2 is the maintained fork",
+    "reason": "Original crate unmaintained \u2014 memmap2 is the maintained fork",
     "source": "RustSec"
   },
   {
     "pattern": "failure",
     "replacement": "anyhow + thiserror",
     "kind": "Unmaintained",
-    "reason": "failure is deprecated and unmaintained — anyhow (app) + thiserror (lib) is the standard",
+    "reason": "failure is deprecated and unmaintained \u2014 anyhow (app) + thiserror (lib) is the standard",
     "source": "blessed.rs"
   },
   {
     "pattern": "log",
     "replacement": "tracing",
     "kind": "ModernAlternative",
-    "reason": "Structured, async-aware, span-based — the modern standard for observability",
+    "reason": "Structured, async-aware, span-based \u2014 the modern standard for observability",
     "source": "blessed.rs"
   },
   {
@@ -74,21 +74,21 @@
     "pattern": "tokio+async-std",
     "replacement": "tokio only",
     "kind": "ComboWin",
-    "reason": "Dominant runtime ecosystem — no need for two runtimes",
+    "reason": "Dominant runtime ecosystem \u2014 no need for two runtimes",
     "source": "blessed.rs"
   },
   {
     "pattern": "env_logger",
     "replacement": "tracing-subscriber",
     "kind": "ModernAlternative",
-    "reason": "Pairs with tracing — structured, filterable, async-aware logging",
+    "reason": "Pairs with tracing \u2014 structured, filterable, async-aware logging",
     "source": "blessed.rs"
   },
   {
     "pattern": "log+env_logger",
     "replacement": "tracing + tracing-subscriber",
     "kind": "ComboWin",
-    "reason": "Full modern observability stack — structured spans + subscriber",
+    "reason": "Full modern observability stack \u2014 structured spans + subscriber",
     "source": "blessed.rs"
   },
   {
@@ -104,5 +104,89 @@
     "kind": "ModernAlternative",
     "reason": "axum is lighter, Tokio-native, and the blessed.rs pick for new projects",
     "source": "blessed.rs"
+  },
+  {
+    "pattern": "maplit",
+    "replacement": "std::collections::HashMap::from / BTreeMap::from",
+    "kind": "StdReplacement",
+    "reason": "HashMap::from([...]) is stable since Rust 1.56 \u2014 zero extra dependencies",
+    "source": "std docs"
+  },
+  {
+    "pattern": "error-chain",
+    "replacement": "anyhow + thiserror",
+    "kind": "Unmaintained",
+    "reason": "error-chain is in maintenance mode \u2014 anyhow (app errors) + thiserror (library errors) is the modern standard",
+    "source": "blessed.rs"
+  },
+  {
+    "pattern": "proc-macro-error",
+    "replacement": "thiserror",
+    "kind": "ModernAlternative",
+    "reason": "thiserror handles proc-macro error reporting with less boilerplate and better DX",
+    "source": "blessed.rs"
+  },
+  {
+    "pattern": "derivative",
+    "replacement": "derive_more",
+    "kind": "Unmaintained",
+    "reason": "derivative has been unmaintained since 2021 \u2014 derive_more is the actively maintained successor",
+    "source": "crates.io"
+  },
+  {
+    "pattern": "anyhow+error-chain",
+    "replacement": "anyhow only (app) or thiserror (lib)",
+    "kind": "ComboWin",
+    "reason": "error-chain and anyhow solve the same problem \u2014 pick one pattern, not both",
+    "source": "blessed.rs"
+  },
+  {
+    "pattern": "bytes+try_from_bytes",
+    "replacement": "bytes with built-in TryInto<&[u8]>",
+    "kind": "FeatureOptimization",
+    "reason": "bytes crate provides zero-copy slicing natively \u2014 try_from_bytes is redundant",
+    "source": "bytes docs"
+  },
+  {
+    "pattern": "num_cpus",
+    "replacement": "std::thread::available_parallelism",
+    "kind": "StdReplacement",
+    "reason": "Stable since Rust 1.9 \u2014 zero extra dependencies for CPU count queries",
+    "source": "std docs"
+  },
+  {
+    "pattern": "rustc-serialize",
+    "replacement": "serde",
+    "kind": "Unmaintained",
+    "reason": "rustc-serialize was removed from rustc in 1.0 and is abandoned \u2014 serde is the universal standard",
+    "source": "blessed.rs"
+  },
+  {
+    "pattern": "serde_derive",
+    "replacement": "serde with \"derive\" feature",
+    "kind": "FeatureOptimization",
+    "reason": "serde_derive is a legacy split \u2014 serde's built-in derive feature provides the same macros",
+    "source": "serde docs"
+  },
+  {
+    "pattern": "crossbeam-utils",
+    "replacement": "std::sync primitives or parking_lot",
+    "kind": "ModernAlternative",
+    "reason": "Many crossbeam-utils features are now in std (OnceLock, Mutex); parking_lot is lighter for remaining needs",
+    "source": "blessed.rs"
+  },
+  {
+    "pattern": "hyper+serde_json",
+    "replacement": "axum with built-in JSON support",
+    "kind": "ComboWin",
+    "reason": "axum bundles serde_json integration natively \u2014 fewer deps, less boilerplate",
+    "source": "blessed.rs"
+  },
+  {
+    "pattern": "clap+clap_derive",
+    "replacement": "clap with \"derive\" feature",
+    "kind": "FeatureOptimization",
+    "reason": "clap_derive is a legacy split \u2014 clap's built-in derive feature provides the same macros",
+    "source": "clap docs"
   }
 ]

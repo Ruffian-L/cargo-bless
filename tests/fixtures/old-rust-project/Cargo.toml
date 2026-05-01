@@ -1,0 +1,27 @@
+[package]
+name = "old-rust-project"
+version = "0.3.1"
+edition = "2018"
+description = "A legacy Rust CLI tool with outdated dependencies"
+
+[dependencies]
+# Outdated: should be replaced by std::sync::LazyLock
+lazy_static = "1.4"
+
+# Outdated: structopt is unmaintained, clap v4 is the successor
+structopt = "0.3"
+
+# Outdated: log + env_logger combo -> tracing + tracing-subscriber
+log = "0.4"
+env_logger = "0.9"
+
+# Outdated: memmap is unmaintained, memmap2 is the fork
+memmap = "0.7"
+
+# Modern: should NOT be flagged
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.0", features = ["full"] }
+
+[dev-dependencies]
+# Outdated in dev-deps too
+once_cell = "1.18"
