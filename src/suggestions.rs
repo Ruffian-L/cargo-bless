@@ -1,5 +1,4 @@
-//! Suggestion engine — rule-based recommendations from blessed.rs mappings
-//! with optional LLM RAG grounding for context-aware 2026 advice.
+//! Suggestion engine — rule-based recommendations from blessed.rs mappings.
 
 use std::collections::HashSet;
 

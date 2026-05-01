@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
 use colored::*;
 
@@ -12,15 +12,19 @@ fn main() -> Result<()> {
 
     match args.command {
         cli::Commands::Bless(opts) => {
+            reject_unfinished_flags(&opts)?;
             let manifest = opts.manifest_path.as_deref();
             let run_code_audit = !opts.no_audit_code || opts.audit_code;
-            let policy = load_policy(opts.policy.as_deref(), manifest);
+            let policy = load_policy(opts.policy.as_deref(), manifest)?;
             let code_audit_config = cargo_bless::code_audit::config_from_policy(policy.as_ref());
 
             if opts.json {
                 let deps = cargo_bless::parser::get_deps(manifest)?;
                 let rules = cargo_bless::suggestions::load_rules();
-                let suggestions = cargo_bless::suggestions::analyze(manifest, &deps, &rules);
+                let suggestions = apply_policy(
+                    cargo_bless::suggestions::analyze(manifest, &deps, &rules),
+                    policy.as_ref(),
+                );
                 let code_audit = if run_code_audit {
                     Some(cargo_bless::code_audit::scan_project(
                         manifest,
@@ -42,13 +46,6 @@ fn main() -> Result<()> {
                 println!();
                 println!("Rules updated. Run `cargo bless` to use them.");
                 return Ok(());
-            }
-            if opts.llm {
-                println!(
-                    "{}",
-                    "LLM-powered suggestions are not yet implemented. Stay tuned!".yellow()
-                );
-                println!();
             }
             if opts.fix {
                 if opts.dry_run {
@@ -104,7 +101,10 @@ fn main() -> Result<()> {
             // Suggestion engine: load rules → analyze
             println!();
             let rules = cargo_bless::suggestions::load_rules();
-            let suggestions = cargo_bless::suggestions::analyze(manifest, &deps, &rules);
+            let suggestions = apply_policy(
+                cargo_bless::suggestions::analyze(manifest, &deps, &rules),
+                policy.as_ref(),
+            );
 
             // Live intelligence: fetch metadata for flagged deps (non-fatal)
             let intel = if !opts.offline && !suggestions.is_empty() {
@@ -170,7 +170,7 @@ fn main() -> Result<()> {
         }
         cli::Commands::Bs(opts) => {
             let manifest = opts.manifest_path.as_deref();
-            let policy = load_policy(opts.policy.as_deref(), manifest);
+            let policy = load_policy(opts.policy.as_deref(), manifest)?;
             let code_audit_config = cargo_bless::code_audit::config_from_policy(policy.as_ref());
             let report = if opts.diff {
                 cargo_bless::code_audit::scan_git_diff(manifest, &code_audit_config)?
@@ -193,11 +193,18 @@ fn main() -> Result<()> {
 fn load_policy(
     explicit_path: Option<&Path>,
     manifest_path: Option<&Path>,
-) -> Option<cargo_bless::policy::Policy> {
-    let path = explicit_path
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| default_policy_path(manifest_path));
-    cargo_bless::policy::load_policy(&path)
+) -> Result<Option<cargo_bless::policy::Policy>> {
+    match explicit_path {
+        Some(path) => cargo_bless::policy::try_load_policy(path).map(Some),
+        None => {
+            let path = default_policy_path(manifest_path);
+            if path.exists() {
+                cargo_bless::policy::try_load_policy(&path).map(Some)
+            } else {
+                Ok(None)
+            }
+        }
+    }
 }
 
 fn default_policy_path(manifest_path: Option<&Path>) -> PathBuf {
@@ -206,4 +213,34 @@ fn default_policy_path(manifest_path: Option<&Path>) -> PathBuf {
         .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."))
         .join("bless.toml")
+}
+
+fn apply_policy(
+    suggestions: Vec<cargo_bless::suggestions::Suggestion>,
+    policy: Option<&cargo_bless::policy::Policy>,
+) -> Vec<cargo_bless::suggestions::Suggestion> {
+    match policy {
+        Some(policy) => cargo_bless::policy::apply_policy(suggestions, policy),
+        None => suggestions,
+    }
+}
+
+fn reject_unfinished_flags(opts: &cli::BlessOpts) -> Result<()> {
+    if opts.llm {
+        bail!("--llm is not implemented in cargo-bless yet");
+    }
+    if !opts.fail_on.is_empty() {
+        bail!("--fail-on is not implemented in cargo-bless yet");
+    }
+    if opts.workspace {
+        bail!("--workspace is not implemented in cargo-bless yet");
+    }
+    if !opts.package.is_empty() {
+        bail!("--package is not implemented in cargo-bless yet");
+    }
+    if opts.all_targets {
+        bail!("--all-targets is not implemented in cargo-bless yet");
+    }
+
+    Ok(())
 }

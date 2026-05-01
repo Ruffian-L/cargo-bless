@@ -86,7 +86,7 @@ pub struct PolicySettings {
     #[serde(default)]
     pub max_suggestions: usize,
 
-    /// Confidence threshold for LLM-powered suggestions (0.0–1.0).
+    /// Reserved confidence threshold for future machine-assisted suggestions.
     #[serde(default)]
     pub min_confidence: f64,
 }
@@ -105,9 +105,17 @@ pub struct CodeAuditPolicy {
 /// Load policy from a bless.toml file at the given path.
 /// Returns None if the file does not exist or cannot be parsed.
 pub fn load_policy(path: &Path) -> Option<Policy> {
-    let content = fs::read_to_string(path).ok()?;
-    let policy: Policy = toml_edit::de::from_str(&content).ok()?;
-    Some(policy)
+    try_load_policy(path).ok()
+}
+
+/// Load policy from a bless.toml file at the given path.
+/// Returns an error if the file is missing, unreadable, or invalid.
+pub fn try_load_policy(path: &Path) -> anyhow::Result<Policy> {
+    let content = fs::read_to_string(path)
+        .map_err(|err| anyhow::anyhow!("failed to read policy {}: {err}", path.display()))?;
+    let policy: Policy = toml_edit::de::from_str(&content)
+        .map_err(|err| anyhow::anyhow!("failed to parse policy {}: {err}", path.display()))?;
+    Ok(policy)
 }
 
 /// Filter suggestions based on policy rules.
@@ -122,7 +130,9 @@ pub fn apply_policy(
         .into_iter()
         .filter(|s| {
             // Check ignore_packages
-            if policy.ignore_packages.iter().any(|p| s.current.contains(p)) {
+            if suggestion_crates(&s.current)
+                .any(|name| policy.ignore_packages.iter().any(|ignored| ignored == name))
+            {
                 return false;
             }
 
@@ -145,6 +155,10 @@ pub fn apply_policy(
     }
 
     filtered
+}
+
+fn suggestion_crates(current: &str) -> impl Iterator<Item = &str> {
+    current.split('+').map(str::trim)
 }
 
 #[cfg(test)]
@@ -233,5 +247,44 @@ suppress = true
 
         let filtered = apply_policy(suggestions, &policy);
         assert_eq!(filtered.len(), 2, "should cap at max_suggestions");
+    }
+
+    #[test]
+    fn test_ignore_packages_matches_exact_crate_tokens() {
+        let policy = Policy {
+            ignore_packages: vec!["rand".to_string()],
+            ..Default::default()
+        };
+
+        let suggestions = vec![
+            crate::suggestions::Suggestion {
+                kind: crate::suggestions::SuggestionKind::ModernAlternative,
+                current: "rand".into(),
+                recommended: "getrandom".into(),
+                reason: "test".into(),
+                source: "test".into(),
+                impact: crate::suggestions::Impact::Low,
+                confidence: crate::suggestions::Confidence::Medium,
+                migration_risk: crate::suggestions::MigrationRisk::Medium,
+                autofix_safety: crate::suggestions::AutofixSafety::ManualOnly,
+                evidence_source: crate::suggestions::EvidenceSource::Heuristic,
+            },
+            crate::suggestions::Suggestion {
+                kind: crate::suggestions::SuggestionKind::ModernAlternative,
+                current: "fastrand".into(),
+                recommended: "rand".into(),
+                reason: "test".into(),
+                source: "test".into(),
+                impact: crate::suggestions::Impact::Low,
+                confidence: crate::suggestions::Confidence::Medium,
+                migration_risk: crate::suggestions::MigrationRisk::Medium,
+                autofix_safety: crate::suggestions::AutofixSafety::ManualOnly,
+                evidence_source: crate::suggestions::EvidenceSource::Heuristic,
+            },
+        ];
+
+        let filtered = apply_policy(suggestions, &policy);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].current, "fastrand");
     }
 }
