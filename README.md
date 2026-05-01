@@ -2,6 +2,8 @@
 
 A Cargo subcommand that checks your dependencies against [blessed.rs](https://blessed.rs/) recommendations and suggests modern alternatives.
 
+`cargo-bless` checks whether your Rust dependency tree is modern, boring, and defensible.
+
 ## What it does
 
 - Scans your `Cargo.toml` dependency tree (direct + transitive, with features)
@@ -10,6 +12,13 @@ A Cargo subcommand that checks your dependencies against [blessed.rs](https://bl
 - Runs a built-in bullshit detector code audit for suspicious Rust complexity patterns
 - Fetches live metadata from crates.io (latest version, downloads) and GitHub (last push, archived status)
 - Optionally applies safe fixes to your `Cargo.toml` with `--fix` (preview first with `--dry-run`)
+
+## What cargo-bless is not
+
+- It is not a replacement for `cargo audit`, `cargo deny`, or license/security policy tooling.
+- It is not automatic truth. Recommendations include confidence, migration risk, autofix safety, and evidence source.
+- It is not a source rewriter. `--fix` only applies rules marked as safe Cargo.toml-only edits.
+- It is not a command to blindly run in production without reading the report.
 
 ## Installation
 
@@ -92,7 +101,7 @@ Or pass a custom path: `cargo bless --policy=custom-bless.toml`
 ```
 $ cargo bless
 
-🔥 cargo-bless v0.1.0
+🔥 cargo-bless v0.1.2
 
 📋 Scanning dependencies...
 
@@ -108,6 +117,8 @@ Found 16 direct deps, 317 total.
 🚀 Modernization report for my-project v0.1.0
 
  • [LOW] reqwest+serde_json → reqwest with "json" feature
+   [HIGH confidence] [LOW risk] [autofix: Cargo.toml-only] evidence: crate docs
+   reqwest can deserialize JSON directly when its json feature is enabled; cargo-bless only suggests this when serde_json is not used directly in source
       latest: v0.13.2, 64.6M recent downloads
 
 0 high-impact upgrades available.
@@ -138,52 +149,46 @@ Changes that would be applied:
 
 ## Built-in rules
 
-| Pattern | Suggestion | Kind | Impact |
-|---------|-----------|------|--------|
-| `lazy_static` | `std::sync::LazyLock` | StdReplacement | High |
-| `once_cell` | `std::sync::LazyLock` / `OnceLock` | StdReplacement | High |
-| `memmap` | `memmap2` | Unmaintained | High |
-| `failure` | `anyhow` + `thiserror` | Unmaintained | High |
-| `iron` | `axum` | Unmaintained | High |
-| `structopt` | `clap v4 (derive)` | ModernAlternative | Medium |
-| `actix-web` | `axum` | ModernAlternative | Medium |
-| `log` | `tracing` | ModernAlternative | Medium |
-| `chrono` | `time` | ModernAlternative | Medium |
-| `env_logger` | `tracing-subscriber` | ModernAlternative | Medium |
-| `reqwest` + `serde_json` | `reqwest` with `json` feature | FeatureOptimization | Low |
-| `tokio` + `async-std` | `tokio` only | ComboWin | Medium |
-| `log` + `env_logger` | `tracing` + `tracing-subscriber` | ComboWin | Medium |
-| `warp` | `axum` | ModernAlternative | Medium |
-| `rocket` | `axum` | ModernAlternative | Medium |
-| `maplit` | `HashMap::from` / `BTreeMap::from` | StdReplacement | High |
-| `error-chain` | `anyhow` + `thiserror` | Unmaintained | High |
-| `derivative` | `derive_more` | Unmaintained | High |
-| `proc-macro-error` | `thiserror` | ModernAlternative | Medium |
-| `anyhow` + `error-chain` | pick one pattern | ComboWin | Medium |
-| `bytes` + `try_from_bytes` | `bytes` native slicing | FeatureOptimization | Low |
+Each rule carries trust metadata:
+
+- `impact`: how important the dependency choice may be.
+- `confidence`: how strong the recommendation is.
+- `migration_risk`: how likely the change is to require careful review.
+- `autofix_safety`: whether `cargo bless --fix` may edit `Cargo.toml`.
+- `evidence_source`: where the recommendation is grounded.
+
+| Pattern | Suggestion | Impact | Confidence | Risk | Autofix |
+|---------|------------|--------|------------|------|---------|
+| `lazy_static` | `std::sync::LazyLock` | High | High | Low | Manual |
+| `once_cell` | `std::sync::LazyLock` / `OnceLock` | High | High | Low | Manual |
+| `memmap` | `memmap2` | High | High | Medium | Manual |
+| `failure` | `anyhow` + `thiserror` | High | High | Medium | Manual |
+| `iron` | `axum` | High | High | High | Manual |
+| `structopt` | `clap v4 (derive)` | Medium | High | Medium | Manual |
+| `log` | `tracing` | Medium | Medium | Medium | Manual |
+| `chrono` | consider `time` | Medium | Low | Medium | Manual |
+| `reqwest` + `serde_json` | `reqwest` with `json` feature | Low | High | Low | Cargo.toml-only |
+| `serde_derive` | `serde` with `derive` feature | Low | High | Low | Cargo.toml-only |
+| `clap` + `clap_derive` | `clap` with `derive` feature | Low | High | Low | Cargo.toml-only |
 
 Rules are embedded at compile time from `data/suggestions.json`. PRs to add more are welcome.
 
 ## How --fix works
 
-Only some suggestion types are auto-fixable (the ones that only need `Cargo.toml` changes):
+Only suggestions marked `autofix_safety = "CargoTomlOnly"` are auto-fixable.
 
-- **StdReplacement** — removes the dep (you still need to update your source code)
-- **Unmaintained** — renames the dep key to the maintained fork
-- **FeatureOptimization** — removes the extra dep and enables the feature on the main dep
-
-`ModernAlternative` and `ComboWin` are reported but not auto-fixed, since they require source code changes.
+`StdReplacement`, `Unmaintained`, `ModernAlternative`, and `ComboWin` are reported but not auto-fixed by default, since they usually require source code changes or architectural judgment.
 
 Code-audit findings are advisory in this release. `--fix` only edits dependency declarations in `Cargo.toml`; it never rewrites Rust source files.
 
-Before any edit, `--fix` creates a `Cargo.toml.bak` backup and runs `cargo update` afterward.
+Before any write, `--fix` creates a `Cargo.toml.bak` backup and runs `cargo update` afterward.
 
 ## How it works
 
 1. `cargo_metadata` parses the full resolved dependency tree with features
 2. Rules from `data/suggestions.json` are matched against direct deps (single-crate and combo patterns)
 3. `crates_io_api::SyncClient` fetches live metadata (cached to `~/.cache/cargo-bless/` with 1-hour TTL)
-4. `octocrab` checks GitHub for `pushed_at`, `archived`, and star count
+4. `reqwest` checks GitHub for `pushed_at`, `archived`, and star count
 5. The bullshit detector scans Rust files under `src`, `tests`, `examples`, and `benches` for static complexity patterns
 6. `toml_edit` applies fixes while preserving comments and formatting
 

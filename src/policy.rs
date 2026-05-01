@@ -193,6 +193,10 @@ suppress = true
             reason: "built-in since 1.80".into(),
             source: "test".into(),
             impact: crate::suggestions::Impact::High,
+            confidence: crate::suggestions::Confidence::High,
+            migration_risk: crate::suggestions::MigrationRisk::Low,
+            autofix_safety: crate::suggestions::AutofixSafety::ManualOnly,
+            evidence_source: crate::suggestions::EvidenceSource::Heuristic,
         }];
 
         let filtered = apply_policy(suggestions, &policy);
@@ -220,6 +224,10 @@ suppress = true
                 reason: "test".into(),
                 source: "test".into(),
                 impact: crate::suggestions::Impact::Low,
+                confidence: crate::suggestions::Confidence::Medium,
+                migration_risk: crate::suggestions::MigrationRisk::Medium,
+                autofix_safety: crate::suggestions::AutofixSafety::ManualOnly,
+                evidence_source: crate::suggestions::EvidenceSource::Heuristic,
             })
             .collect();
 
