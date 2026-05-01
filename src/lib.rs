@@ -1,3 +1,4 @@
+pub mod bs_detector;
 pub mod code_audit;
 pub mod fix;
 pub mod intel;

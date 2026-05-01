@@ -177,6 +177,10 @@ fn convert_to_rules(data: &BlessedData) -> Vec<Rule> {
                         reason,
                         source: "blessed.rs".to_string(),
                         condition: None,
+                        confidence: crate::suggestions::Confidence::Medium,
+                        migration_risk: crate::suggestions::MigrationRisk::Medium,
+                        autofix_safety: crate::suggestions::AutofixSafety::ManualOnly,
+                        evidence_source: crate::suggestions::EvidenceSource::BlessedRs,
                     });
                 }
             }

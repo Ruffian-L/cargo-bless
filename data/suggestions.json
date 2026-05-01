@@ -3,190 +3,333 @@
     "pattern": "chrono",
     "replacement": "time",
     "kind": "ModernAlternative",
-    "reason": "Smaller footprint, faster compiles for UTC-only use",
+    "reason": "time is a strong modern option for smaller/simple datetime needs, but chrono is still maintained and may be correct for timezone-heavy projects",
     "source": "blessed.rs",
-    "condition": "UTC-only usage"
+    "condition": "UTC-only or simple datetime usage",
+    "confidence": "Low",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "lazy_static",
     "replacement": "std::sync::LazyLock",
     "kind": "StdReplacement",
-    "reason": "Stable since Rust 1.80 \u2014 zero extra dependencies",
-    "source": "std docs"
+    "reason": "LazyLock is stable since Rust 1.80 and can remove an extra dependency after source imports are updated",
+    "source": "std docs",
+    "confidence": "High",
+    "migration_risk": "Low",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "StdDocs"
   },
   {
     "pattern": "once_cell",
     "replacement": "std::sync::LazyLock / OnceLock",
     "kind": "StdReplacement",
-    "reason": "LazyLock and OnceLock stable since Rust 1.80 \u2014 zero extra dependencies",
-    "source": "std docs"
+    "reason": "LazyLock and OnceLock are stable since Rust 1.80 and may cover common once_cell usage after source imports are updated",
+    "source": "std docs",
+    "confidence": "High",
+    "migration_risk": "Low",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "StdDocs"
   },
   {
     "pattern": "structopt",
     "replacement": "clap v4 (derive)",
     "kind": "ModernAlternative",
-    "reason": "Fully integrated and actively maintained",
-    "source": "blessed.rs"
+    "reason": "structopt functionality was folded into clap derive; migrate when you are ready to update CLI derives and attributes",
+    "source": "blessed.rs",
+    "confidence": "High",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "actix-web",
     "replacement": "axum",
     "kind": "ModernAlternative",
-    "reason": "Lightweight, Tokio-native, ergonomic",
-    "source": "blessed.rs"
+    "reason": "axum is a common Tokio-native choice for new services, but actix-web remains maintained; treat this as an ecosystem preference, not a mandatory migration",
+    "source": "blessed.rs",
+    "confidence": "Low",
+    "migration_risk": "High",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "iron",
     "replacement": "axum",
     "kind": "Unmaintained",
-    "reason": "Iron is unmaintained \u2014 axum is the modern Tokio-native choice",
-    "source": "blessed.rs"
+    "reason": "Iron is no longer a good foundation for new Rust web services; axum is a maintained Tokio-native migration target",
+    "source": "blessed.rs",
+    "confidence": "High",
+    "migration_risk": "High",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "memmap",
     "replacement": "memmap2",
     "kind": "Unmaintained",
-    "reason": "Original crate unmaintained \u2014 memmap2 is the maintained fork",
-    "source": "RustSec"
+    "reason": "memmap is unmaintained; memmap2 is the maintained fork, but source imports and API details still need review",
+    "source": "RustSec",
+    "confidence": "High",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "RustSec"
   },
   {
     "pattern": "failure",
     "replacement": "anyhow + thiserror",
     "kind": "Unmaintained",
-    "reason": "failure is deprecated and unmaintained \u2014 anyhow (app) + thiserror (lib) is the standard",
-    "source": "blessed.rs"
+    "reason": "failure is deprecated and unmaintained; anyhow for application errors and thiserror for library errors is the common modern split",
+    "source": "blessed.rs",
+    "confidence": "High",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "log",
     "replacement": "tracing",
     "kind": "ModernAlternative",
-    "reason": "Structured, async-aware, span-based \u2014 the modern standard for observability",
-    "source": "blessed.rs"
+    "reason": "tracing adds structured spans and async-aware instrumentation, but log is still maintained and may be enough for simple libraries",
+    "source": "blessed.rs",
+    "confidence": "Medium",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "reqwest+serde_json",
     "replacement": "reqwest with \"json\" feature",
     "kind": "FeatureOptimization",
-    "reason": "Built-in deserialization, one fewer dependency",
-    "source": "reqwest docs"
+    "reason": "reqwest can deserialize JSON directly when its json feature is enabled; cargo-bless only suggests this when serde_json is not used directly in source",
+    "source": "reqwest docs",
+    "confidence": "High",
+    "migration_risk": "Low",
+    "autofix_safety": "CargoTomlOnly",
+    "evidence_source": "CrateDocs"
   },
   {
     "pattern": "tokio+async-std",
     "replacement": "tokio only",
     "kind": "ComboWin",
-    "reason": "Dominant runtime ecosystem \u2014 no need for two runtimes",
-    "source": "blessed.rs"
+    "reason": "using two async runtimes usually adds complexity; consolidate only after checking runtime boundaries and dependencies",
+    "source": "blessed.rs",
+    "confidence": "Medium",
+    "migration_risk": "High",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "env_logger",
     "replacement": "tracing-subscriber",
     "kind": "ModernAlternative",
-    "reason": "Pairs with tracing \u2014 structured, filterable, async-aware logging",
-    "source": "blessed.rs"
+    "reason": "tracing-subscriber pairs with tracing for structured, filterable logging; keep env_logger if log-based output is intentionally simple",
+    "source": "blessed.rs",
+    "confidence": "Medium",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "log+env_logger",
     "replacement": "tracing + tracing-subscriber",
     "kind": "ComboWin",
-    "reason": "Full modern observability stack \u2014 structured spans + subscriber",
-    "source": "blessed.rs"
+    "reason": "tracing plus tracing-subscriber is the modern observability stack, but migration requires source instrumentation choices",
+    "source": "blessed.rs",
+    "confidence": "Medium",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "warp",
     "replacement": "axum",
     "kind": "ModernAlternative",
-    "reason": "axum is the actively maintained Tokio-native web framework",
-    "source": "blessed.rs"
+    "reason": "axum is the more active Tokio-native web framework choice for new projects; migration from warp should be deliberate",
+    "source": "blessed.rs",
+    "confidence": "Medium",
+    "migration_risk": "High",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "rocket",
     "replacement": "axum",
     "kind": "ModernAlternative",
-    "reason": "axum is lighter, Tokio-native, and the blessed.rs pick for new projects",
-    "source": "blessed.rs"
+    "reason": "axum is a common lightweight Tokio-native choice, but Rocket may still be appropriate if its ergonomics are important to the project",
+    "source": "blessed.rs",
+    "confidence": "Low",
+    "migration_risk": "High",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "maplit",
     "replacement": "std::collections::HashMap::from / BTreeMap::from",
     "kind": "StdReplacement",
-    "reason": "HashMap::from([...]) is stable since Rust 1.56 \u2014 zero extra dependencies",
-    "source": "std docs"
+    "reason": "std collection constructors cover many maplit use cases after source macros are rewritten",
+    "source": "std docs",
+    "confidence": "High",
+    "migration_risk": "Low",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "StdDocs"
   },
   {
     "pattern": "error-chain",
     "replacement": "anyhow + thiserror",
     "kind": "Unmaintained",
-    "reason": "error-chain is in maintenance mode \u2014 anyhow (app errors) + thiserror (library errors) is the modern standard",
-    "source": "blessed.rs"
+    "reason": "error-chain is in maintenance mode; anyhow for app errors and thiserror for library errors is the common modern split",
+    "source": "blessed.rs",
+    "confidence": "High",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "proc-macro-error",
-    "replacement": "thiserror",
+    "replacement": "syn::Error or proc-macro-error2",
     "kind": "ModernAlternative",
-    "reason": "thiserror handles proc-macro error reporting with less boilerplate and better DX",
-    "source": "blessed.rs"
+    "reason": "proc-macro diagnostics need compile-time errors with spans; syn::Error is the standard baseline and proc-macro-error2 is an ergonomic option",
+    "source": "crate docs",
+    "confidence": "Medium",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "CrateDocs"
   },
   {
     "pattern": "derivative",
     "replacement": "derive_more",
     "kind": "Unmaintained",
-    "reason": "derivative has been unmaintained since 2021 \u2014 derive_more is the actively maintained successor",
-    "source": "crates.io"
+    "reason": "derivative appears inactive; derive_more may cover many derive helper use cases, but macro behavior needs source review",
+    "source": "crates.io",
+    "confidence": "Medium",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "CratesIo"
   },
   {
     "pattern": "anyhow+error-chain",
     "replacement": "anyhow only (app) or thiserror (lib)",
     "kind": "ComboWin",
-    "reason": "error-chain and anyhow solve the same problem \u2014 pick one pattern, not both",
-    "source": "blessed.rs"
+    "reason": "error-chain and anyhow overlap; pick one error handling pattern based on whether this is an application or library boundary",
+    "source": "blessed.rs",
+    "confidence": "High",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "bytes+try_from_bytes",
-    "replacement": "bytes with built-in TryInto<&[u8]>",
+    "replacement": "bytes with built-in zero-copy slicing",
     "kind": "FeatureOptimization",
-    "reason": "bytes crate provides zero-copy slicing natively \u2014 try_from_bytes is redundant",
-    "source": "bytes docs"
+    "reason": "bytes already provides the core zero-copy byte buffer primitives; verify the helper crate is not adding project-specific parsing behavior",
+    "source": "bytes docs",
+    "confidence": "Medium",
+    "migration_risk": "Low",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "CrateDocs"
   },
   {
     "pattern": "num_cpus",
     "replacement": "std::thread::available_parallelism",
     "kind": "StdReplacement",
-    "reason": "Stable since Rust 1.9 \u2014 zero extra dependencies for CPU count queries",
-    "source": "std docs"
+    "reason": "available_parallelism covers common CPU count queries in std after source calls are updated",
+    "source": "std docs",
+    "confidence": "High",
+    "migration_risk": "Low",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "StdDocs"
   },
   {
     "pattern": "rustc-serialize",
     "replacement": "serde",
     "kind": "Unmaintained",
-    "reason": "rustc-serialize was removed from rustc in 1.0 and is abandoned \u2014 serde is the universal standard",
-    "source": "blessed.rs"
+    "reason": "rustc-serialize is obsolete; serde is the standard serialization ecosystem, but migration is a real source change",
+    "source": "blessed.rs",
+    "confidence": "High",
+    "migration_risk": "High",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "serde_derive",
     "replacement": "serde with \"derive\" feature",
     "kind": "FeatureOptimization",
-    "reason": "serde_derive is a legacy split \u2014 serde's built-in derive feature provides the same macros",
-    "source": "serde docs"
+    "reason": "serde exposes derive through its own feature; this can usually remove the separate serde_derive dependency without source rewrites",
+    "source": "serde docs",
+    "confidence": "High",
+    "migration_risk": "Low",
+    "autofix_safety": "CargoTomlOnly",
+    "evidence_source": "CrateDocs"
   },
   {
     "pattern": "crossbeam-utils",
     "replacement": "std::sync primitives or parking_lot",
     "kind": "ModernAlternative",
-    "reason": "Many crossbeam-utils features are now in std (OnceLock, Mutex); parking_lot is lighter for remaining needs",
-    "source": "blessed.rs"
+    "reason": "some crossbeam-utils use cases are now covered by std, while parking_lot may fit some locking needs; inspect actual APIs before changing",
+    "source": "blessed.rs",
+    "confidence": "Low",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "hyper+serde_json",
     "replacement": "axum with built-in JSON support",
     "kind": "ComboWin",
-    "reason": "axum bundles serde_json integration natively \u2014 fewer deps, less boilerplate",
-    "source": "blessed.rs"
+    "reason": "axum can reduce boilerplate for application HTTP JSON handling, but hyper remains right for lower-level HTTP code",
+    "source": "blessed.rs",
+    "confidence": "Low",
+    "migration_risk": "High",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   },
   {
     "pattern": "clap+clap_derive",
     "replacement": "clap with \"derive\" feature",
     "kind": "FeatureOptimization",
-    "reason": "clap_derive is a legacy split \u2014 clap's built-in derive feature provides the same macros",
-    "source": "clap docs"
+    "reason": "clap exposes derive through its own feature; this can usually remove the separate clap_derive dependency without source rewrites",
+    "source": "clap docs",
+    "confidence": "High",
+    "migration_risk": "Low",
+    "autofix_safety": "CargoTomlOnly",
+    "evidence_source": "CrateDocs"
+  },
+  {
+    "pattern": "quick-error",
+    "replacement": "anyhow + thiserror",
+    "kind": "Unmaintained",
+    "reason": "quick-error is unmaintained since 2018 \u2014 anyhow (app) + thiserror (lib) is the modern standard",
+    "source": "crates.io"
+  },
+  {
+    "pattern": "failure_derive",
+    "replacement": "thiserror",
+    "kind": "Unmaintained",
+    "reason": "failure_derive was part of the deprecated failure crate \u2014 thiserror provides better derive macros",
+    "source": "blessed.rs"
+  },
+  {
+    "pattern": "proc-macro-nested",
+    "replacement": "no replacement needed (modern Rust handles nested macros)",
+    "kind": "ModernAlternative",
+    "reason": "proc-macro-nested was a workaround for old macro limitations \u2014 no longer needed in modern Rust",
+    "source": "Rust RFC"
+  },
+  {
+    "pattern": "version_check",
+    "replacement": "rust-version in Cargo.toml or cfg_attr",
+    "kind": "ModernAlternative",
+    "reason": "version_check is a legacy crate for MSRV detection \u2014 use package.rust-version field instead",
+    "source": "Cargo docs"
+  },
+  {
+    "pattern": "semver",
+    "replacement": "built-in version parsing or cargo_metadata",
+    "kind": "ModernAlternative",
+    "reason": "semver crate is rarely needed directly \u2014 use cargo_metadata for dependency resolution",
+    "source": "blessed.rs"
   }
 ]

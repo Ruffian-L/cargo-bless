@@ -28,6 +28,12 @@ jobs:
       - run: cargo clippy -- -D warnings
         if: matrix.toolchain == 'stable'
       - run: cargo test
+      - name: Install smoke test
+        if: matrix.toolchain == 'stable'
+        run: |
+          cargo install --path . --debug
+          cargo bless --help
+          cargo bless --offline --no-audit-code
       - name: Run security audit
         if: matrix.toolchain == 'stable'
         run: |

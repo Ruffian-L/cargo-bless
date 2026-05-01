@@ -408,7 +408,9 @@ fn print_diff(old: &str, new: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::suggestions::{Impact, SuggestionKind};
+    use crate::suggestions::{
+        AutofixSafety, Confidence, EvidenceSource, Impact, MigrationRisk, SuggestionKind,
+    };
     use tempfile::TempDir;
 
     fn make_suggestion(kind: SuggestionKind, current: &str, recommended: &str) -> Suggestion {
@@ -423,6 +425,15 @@ mod tests {
                 SuggestionKind::ModernAlternative | SuggestionKind::ComboWin => Impact::Medium,
                 SuggestionKind::FeatureOptimization => Impact::Low,
             },
+            confidence: Confidence::High,
+            migration_risk: MigrationRisk::Low,
+            autofix_safety: match kind {
+                SuggestionKind::ModernAlternative | SuggestionKind::ComboWin => {
+                    AutofixSafety::ManualOnly
+                }
+                _ => AutofixSafety::CargoTomlOnly,
+            },
+            evidence_source: EvidenceSource::Heuristic,
         }
     }
 
