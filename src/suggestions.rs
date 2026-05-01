@@ -16,18 +16,17 @@ pub struct Suggestion {
     pub reason: String,
     pub source: String,
     pub impact: Impact,
+    pub confidence: Confidence,
+    pub migration_risk: MigrationRisk,
+    pub autofix_safety: AutofixSafety,
+    pub evidence_source: EvidenceSource,
 }
 
 impl Suggestion {
     /// Whether this suggestion can be auto-applied by editing Cargo.toml only.
-    /// ModernAlternative and ComboWin require source code changes, so they stay advisory.
+    /// Only suggestions explicitly marked as Cargo.toml-only are eligible.
     pub fn is_auto_fixable(&self) -> bool {
-        matches!(
-            self.kind,
-            SuggestionKind::StdReplacement
-                | SuggestionKind::Unmaintained
-                | SuggestionKind::FeatureOptimization
-        )
+        matches!(self.autofix_safety, AutofixSafety::CargoTomlOnly)
     }
 }
 
@@ -54,6 +53,42 @@ pub enum Impact {
     Low,
 }
 
+/// Confidence level for a recommendation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum Confidence {
+    High,
+    Medium,
+    Low,
+}
+
+/// Estimated migration risk for applying a recommendation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum MigrationRisk {
+    High,
+    Medium,
+    Low,
+}
+
+/// Whether cargo-bless may safely apply the suggestion itself.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum AutofixSafety {
+    /// Safe to apply by changing Cargo.toml only.
+    CargoTomlOnly,
+    /// Requires source review or source edits.
+    ManualOnly,
+}
+
+/// Primary evidence behind a recommendation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum EvidenceSource {
+    BlessedRs,
+    RustSec,
+    StdDocs,
+    CrateDocs,
+    CratesIo,
+    Heuristic,
+}
+
 /// The embedded blessed.rs-based rule database.
 /// Each rule maps a current pattern to a recommended modern alternative.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,6 +99,14 @@ pub struct Rule {
     pub reason: String,
     pub source: String,
     pub condition: Option<String>,
+    #[serde(default = "default_confidence")]
+    pub confidence: Confidence,
+    #[serde(default = "default_migration_risk")]
+    pub migration_risk: MigrationRisk,
+    #[serde(default = "default_autofix_safety")]
+    pub autofix_safety: AutofixSafety,
+    #[serde(default = "default_evidence_source")]
+    pub evidence_source: EvidenceSource,
 }
 
 /// Derive impact from suggestion kind.
@@ -73,6 +116,22 @@ fn impact_for(kind: &SuggestionKind) -> Impact {
         SuggestionKind::ModernAlternative | SuggestionKind::ComboWin => Impact::Medium,
         SuggestionKind::FeatureOptimization => Impact::Low,
     }
+}
+
+fn default_confidence() -> Confidence {
+    Confidence::Medium
+}
+
+fn default_migration_risk() -> MigrationRisk {
+    MigrationRisk::Medium
+}
+
+fn default_autofix_safety() -> AutofixSafety {
+    AutofixSafety::ManualOnly
+}
+
+fn default_evidence_source() -> EvidenceSource {
+    EvidenceSource::Heuristic
 }
 
 /// Load suggestion rules, merging cached blessed.rs rules with the embedded fallback.
@@ -168,6 +227,10 @@ pub fn analyze(
                 reason: rule.reason.clone(),
                 source: rule.source.clone(),
                 impact: impact_for(&rule.kind),
+                confidence: rule.confidence.clone(),
+                migration_risk: rule.migration_risk.clone(),
+                autofix_safety: rule.autofix_safety.clone(),
+                evidence_source: rule.evidence_source.clone(),
             });
         }
     }
@@ -317,6 +380,10 @@ mod tests {
             reason: "".into(),
             source: "".into(),
             condition: None,
+            confidence: Confidence::High,
+            migration_risk: MigrationRisk::Low,
+            autofix_safety: AutofixSafety::CargoTomlOnly,
+            evidence_source: EvidenceSource::Heuristic,
         };
 
         let suggestions = analyze(None, &deps, &[custom_rule]);

@@ -8,7 +8,8 @@ use serde::Serialize;
 
 use crate::code_audit::{kind_label, CodeAuditReport};
 use crate::intel::CrateIntel;
-use crate::suggestions::{Impact, Suggestion, SuggestionKind};
+use crate::suggestions::{AutofixSafety, Confidence, Impact, MigrationRisk, SuggestionKind};
+use crate::suggestions::{EvidenceSource, Suggestion};
 
 /// Render the full modernization report to stdout.
 ///
@@ -48,16 +49,42 @@ pub fn render_report(
             Impact::Medium => "[MED]".yellow().bold(),
             Impact::Low => "[LOW]".dimmed(),
         };
+        let confidence_tag = match suggestion.confidence {
+            Confidence::High => "[HIGH confidence]".green().bold(),
+            Confidence::Medium => "[MED confidence]".yellow(),
+            Confidence::Low => "[LOW confidence]".red(),
+        };
+        let risk_tag = match suggestion.migration_risk {
+            MigrationRisk::High => "[HIGH risk]".red().bold(),
+            MigrationRisk::Medium => "[MED risk]".yellow(),
+            MigrationRisk::Low => "[LOW risk]".green(),
+        };
+        let autofix_tag = match suggestion.autofix_safety {
+            AutofixSafety::CargoTomlOnly => "[autofix: Cargo.toml-only]".green(),
+            AutofixSafety::ManualOnly => "[autofix: manual]".dimmed(),
+        };
+        let verb = match suggestion.confidence {
+            Confidence::High => "→",
+            Confidence::Medium | Confidence::Low => "→ consider",
+        };
 
         // Base suggestion line
         println!(
-            " {} {} {} → {} ({})",
+            " {} {} {} {} {}",
             icon,
             impact_tag,
             suggestion.current.yellow(),
+            verb,
             suggestion.recommended.green(),
-            suggestion.reason.dimmed()
         );
+        println!(
+            "   {} {} {} {}",
+            confidence_tag,
+            risk_tag,
+            autofix_tag,
+            format!("evidence: {}", evidence_label(&suggestion.evidence_source)).dimmed()
+        );
+        println!("   {}", suggestion.reason.dimmed());
 
         // Enrich with live intel if available
         // For combo rules like "reqwest+serde_json", check each crate name
@@ -83,12 +110,23 @@ pub fn render_report(
     println!(
         "{}",
         format!(
-            "{} high-impact upgrade{} available. Run `cargo bless --fix` to apply safely.",
+            "{} high-impact upgrade{} available. Run `cargo bless --fix --dry-run` to preview Cargo.toml-only fixes.",
             high_count,
             if high_count == 1 { "" } else { "s" }
         )
         .bold()
     );
+}
+
+fn evidence_label(source: &EvidenceSource) -> &'static str {
+    match source {
+        EvidenceSource::BlessedRs => "blessed.rs",
+        EvidenceSource::RustSec => "RustSec",
+        EvidenceSource::StdDocs => "std docs",
+        EvidenceSource::CrateDocs => "crate docs",
+        EvidenceSource::CratesIo => "crates.io",
+        EvidenceSource::Heuristic => "heuristic",
+    }
 }
 
 pub fn render_code_audit_report(report: &CodeAuditReport, verbose: bool) {

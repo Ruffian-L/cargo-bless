@@ -114,15 +114,33 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-lazy_static = "1"
-memmap = "0.7"
-serde = "1.0"
+reqwest = { path = "crates/reqwest" }
+serde_json = { path = "crates/serde_json" }
+serde = { path = "crates/serde" }
+serde_derive = { path = "crates/serde_derive" }
 "#,
     )
     .expect("write Cargo.toml");
 
     fs::create_dir_all(tmp.path().join("src")).expect("create src");
     fs::write(tmp.path().join("src/main.rs"), "fn main() {}").expect("write main.rs");
+    for (name, extra) in [
+        ("reqwest", "[features]\njson = []\n"),
+        ("serde", "[features]\nderive = []\n"),
+        ("serde_json", ""),
+        ("serde_derive", ""),
+    ] {
+        let crate_dir = tmp.path().join("crates").join(name);
+        fs::create_dir_all(crate_dir.join("src")).expect("create path crate src");
+        fs::write(crate_dir.join("src/lib.rs"), "").expect("write path crate lib");
+        fs::write(
+            crate_dir.join("Cargo.toml"),
+            format!(
+                "[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n{extra}"
+            ),
+        )
+        .expect("write path crate manifest");
+    }
 
     let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
     cmd.arg("bless")
@@ -138,10 +156,13 @@ serde = "1.0"
     assert!(output.status.success(), "should exit 0: {}", stdout);
     assert!(stdout.contains("Dry-run"), "should show dry-run header");
     assert!(
-        stdout.contains("lazy_static"),
-        "should list lazy_static for removal"
+        stdout.contains("serde_json"),
+        "should list serde_json for feature optimization"
     );
-    assert!(stdout.contains("memmap2"), "should suggest memmap2 rename");
+    assert!(
+        stdout.contains("serde_derive"),
+        "should list serde_derive for feature optimization"
+    );
     // serde should NOT be in the diff — it's modern
     let diff_section: &str = stdout.split("Dry-run").nth(1).unwrap_or("");
     assert!(
