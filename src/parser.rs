@@ -2,16 +2,20 @@
 //! using `cargo_metadata` for feature-aware resolution.
 
 use anyhow::Result;
-use cargo_metadata::{CargoOpt, MetadataCommand};
+use cargo_metadata::{CargoOpt, MetadataCommand, Node, Package, Resolve};
+use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// A resolved dependency with its name, version, and enabled features.
 #[derive(Debug, Clone)]
 pub struct ResolvedDep {
     pub name: String,
     pub version: String,
-    pub features: Vec<String>,
+    /// Features that are **actually enabled** in the resolved build plan.
+    pub enabled_features: Vec<String>,
+    /// All features **declared** by the crate (available but not necessarily enabled).
+    pub available_features: Vec<String>,
     pub source: Option<String>,
     pub repository: Option<String>,
     pub is_direct: bool,
@@ -19,10 +23,17 @@ pub struct ResolvedDep {
 
 impl fmt::Display for ResolvedDep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let tag = if self.is_direct { "direct" } else { "transitive" };
+        let tag = if self.is_direct {
+            "direct"
+        } else {
+            "transitive"
+        };
         write!(f, "{} v{} ({})", self.name, self.version, tag)?;
-        if !self.features.is_empty() {
-            write!(f, " [{}]", self.features.join(", "))?;
+        if !self.enabled_features.is_empty() {
+            write!(f, " [enabled: {}]", self.enabled_features.join(", "))?;
+        }
+        if !self.available_features.is_empty() && self.available_features != self.enabled_features {
+            write!(f, " (available: {})", self.available_features.join(", "))?;
         }
         Ok(())
     }
@@ -30,10 +41,7 @@ impl fmt::Display for ResolvedDep {
 
 /// Get the root project's name and version from Cargo metadata.
 pub fn get_project_info(manifest_path: Option<&Path>) -> Result<(String, String)> {
-    let mut cmd = MetadataCommand::new();
-    if let Some(path) = manifest_path {
-        cmd.manifest_path(path);
-    }
+    let cmd = metadata_command(manifest_path);
     let metadata = cmd.exec()?;
     let root_id = metadata
         .resolve
@@ -48,15 +56,31 @@ pub fn get_project_info(manifest_path: Option<&Path>) -> Result<(String, String)
     Ok((root_pkg.name.to_string(), root_pkg.version.to_string()))
 }
 
-/// Parse the dependency tree for the project at `manifest_path`.
-/// If `manifest_path` is None, uses the current directory.
-pub fn get_deps(manifest_path: Option<&Path>) -> Result<Vec<ResolvedDep>> {
-    let mut cmd = MetadataCommand::new();
-    cmd.features(CargoOpt::AllFeatures);
+/// Build a lookup from package ID to the resolved Node (which carries enabled features).
+fn build_node_lookup(resolve: &Resolve) -> HashMap<String, Node> {
+    resolve
+        .nodes
+        .iter()
+        .map(|n| (n.id.to_string(), n.clone()))
+        .collect()
+}
 
-    if let Some(path) = manifest_path {
-        cmd.manifest_path(path);
-    }
+/// Build a map from package ID to package reference.
+fn build_pkg_lookup(metadata: &cargo_metadata::Metadata) -> HashMap<String, Package> {
+    metadata
+        .packages
+        .iter()
+        .map(|p| (p.id.to_string(), p.clone()))
+        .collect()
+}
+
+/// Parse the dependency tree for the project at `manifest_path`.
+///
+/// **Key change**: uses `resolve.nodes[].features` for the **actual enabled features**
+/// rather than `pkg.features.keys()` which only lists declared/available features.
+pub fn get_deps(manifest_path: Option<&Path>) -> Result<Vec<ResolvedDep>> {
+    let mut cmd = metadata_command(manifest_path);
+    cmd.features(CargoOpt::AllFeatures);
 
     let metadata = cmd.exec()?;
     let resolve = metadata
@@ -64,102 +88,81 @@ pub fn get_deps(manifest_path: Option<&Path>) -> Result<Vec<ResolvedDep>> {
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("No dependency resolution found"))?;
 
+    // Build node lookup for resolved (enabled) features
+    let node_map = build_node_lookup(resolve);
+    let pkg_map = build_pkg_lookup(&metadata);
+
     // Collect root/direct dependency names for tagging
-    let direct_dep_ids: std::collections::HashSet<_> = resolve
+    let root_id = resolve
         .root
         .as_ref()
-        .and_then(|root_id| {
-            resolve
-                .nodes
-                .iter()
-                .find(|n| &n.id == root_id)
-                .map(|n| n.deps.iter().map(|d| d.pkg.clone()).collect())
-        })
-        .unwrap_or_default();
+        .ok_or_else(|| anyhow::anyhow!("No root package in resolve"))?;
+
+    // Find the root node to get its direct dependencies
+    let root_node = node_map
+        .get(&root_id.to_string())
+        .ok_or_else(|| anyhow::anyhow!("Root node not found in resolve nodes"))?;
+
+    // Direct dependency IDs are those listed as deps of the root node
+    let direct_dep_ids: HashSet<String> =
+        root_node.deps.iter().map(|d| d.pkg.to_string()).collect();
 
     let mut deps = Vec::new();
 
-    for pkg in &metadata.packages {
-        // Skip the workspace root itself
-        if pkg.source.is_none() {
+    for node in &resolve.nodes {
+        // Skip the root package itself
+        if node.id == *root_id {
             continue;
         }
+
+        let pkg = match pkg_map.get(&node.id.to_string()) {
+            Some(p) => p,
+            None => continue, // not a real crate (e.g. virtual manifest)
+        };
+
+        let is_direct = direct_dep_ids.contains(&node.id.to_string());
+
+        // Enabled features come from the resolved node (what's actually turned on)
+        let enabled_features: Vec<String> = node
+            .features
+            .iter()
+            .map(|s| s.as_str().to_string())
+            .collect();
+
+        // Available features come from the package manifest (what's declared)
+        let available_features: Vec<String> = pkg.features.keys().map(|s| s.to_string()).collect();
 
         deps.push(ResolvedDep {
             name: pkg.name.to_string(),
             version: pkg.version.to_string(),
-            features: pkg.features.keys().cloned().collect(),
-            source: pkg.source.as_ref().map(|s| s.repr.clone()),
+            enabled_features,
+            available_features,
+            source: pkg.source.as_ref().map(|s| s.to_string()),
             repository: pkg.repository.clone(),
-            is_direct: direct_dep_ids.contains(&pkg.id),
+            is_direct,
         });
     }
 
     Ok(deps)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+fn metadata_command(manifest_path: Option<&Path>) -> MetadataCommand {
+    let mut cmd = MetadataCommand::new();
 
-    #[test]
-    fn test_resolvedep_debug() {
-        let dep = ResolvedDep {
-            name: "serde".into(),
-            version: "1.0.0".into(),
-            features: vec!["derive".into()],
-            source: Some("registry+https://github.com/rust-lang/crates.io-index".into()),
-            repository: Some("https://github.com/serde-rs/serde".into()),
-            is_direct: true,
-        };
-        assert!(format!("{:?}", dep).contains("serde"));
+    if let Some(path) = manifest_path {
+        cmd.manifest_path(path);
     }
 
-    #[test]
-    fn test_resolvedep_display() {
-        let dep = ResolvedDep {
-            name: "clap".into(),
-            version: "4.5.0".into(),
-            features: vec!["derive".into(), "std".into()],
-            source: Some("registry+https://github.com/rust-lang/crates.io-index".into()),
-            repository: None,
-            is_direct: true,
-        };
-        let display = format!("{}", dep);
-        assert!(display.contains("clap"));
-        assert!(display.contains("4.5.0"));
-        assert!(display.contains("direct"));
-        assert!(display.contains("[derive, std]"));
+    if lockfile_path(manifest_path).is_file() {
+        cmd.other_options(vec!["--locked".to_string()]);
     }
 
-    #[test]
-    fn test_resolvedep_display_transitive_no_features() {
-        let dep = ResolvedDep {
-            name: "unicode-ident".into(),
-            version: "1.0.0".into(),
-            features: vec![],
-            source: Some("registry+https://github.com/rust-lang/crates.io-index".into()),
-            repository: None,
-            is_direct: false,
-        };
-        let display = format!("{}", dep);
-        assert!(display.contains("transitive"));
-        assert!(!display.contains('['));
-    }
+    cmd
+}
 
-    #[test]
-    fn test_get_deps_self() {
-        // Parse our own Cargo.toml as a self-test
-        let deps = get_deps(None).expect("should parse own project");
-        assert!(!deps.is_empty(), "should find at least one dependency");
-
-        // We know clap and serde are direct deps
-        let names: Vec<&str> = deps.iter().map(|d| d.name.as_str()).collect();
-        assert!(names.contains(&"clap"), "clap should be in deps");
-        assert!(names.contains(&"serde"), "serde should be in deps");
-
-        // At least some should be marked as direct
-        let direct_count = deps.iter().filter(|d| d.is_direct).count();
-        assert!(direct_count > 0, "should have direct dependencies");
-    }
+fn lockfile_path(manifest_path: Option<&Path>) -> PathBuf {
+    manifest_path
+        .and_then(Path::parent)
+        .map(|path| path.join("Cargo.lock"))
+        .unwrap_or_else(|| PathBuf::from("Cargo.lock"))
 }

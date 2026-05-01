@@ -13,6 +13,10 @@ Thumbs.db
 
 # Cache
 .cache/
+.firecrawl/
+
+# Local reference copy of the old detector crate
+/bullshitdetector/
 
 # AI planning / notes
 plan.md
