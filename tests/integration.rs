@@ -2,7 +2,8 @@
 //!
 //! Uses `assert_cmd` to run the binary and check stdout/exit codes.
 
-#[allow(deprecated)]
+#![allow(deprecated)]
+
 use assert_cmd::Command;
 use predicates::prelude::*;
 
@@ -44,6 +45,70 @@ fn test_help_flag() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Bless your dependencies"));
+}
+
+#[test]
+fn test_unfinished_flags_are_hidden_from_help() {
+    cargo_bless_cmd()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--fail-on").not())
+        .stdout(predicate::str::contains("--workspace").not())
+        .stdout(predicate::str::contains("--package").not())
+        .stdout(predicate::str::contains("--all-targets").not())
+        .stdout(predicate::str::contains("--llm").not());
+}
+
+#[test]
+fn test_unfinished_flag_exits_nonzero() {
+    cargo_bless_cmd()
+        .arg("--fail-on=high")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--fail-on is not implemented"));
+}
+
+#[test]
+fn test_explicit_missing_policy_exits_nonzero() {
+    cargo_bless_cmd()
+        .arg("--policy")
+        .arg("missing-bless.toml")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("missing-bless.toml"));
+}
+
+#[test]
+fn test_invalid_default_policy_exits_nonzero() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "invalid-policy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(tmp.path().join("src/main.rs"), "fn main() {}\n").expect("write main.rs");
+    fs::write(tmp.path().join("bless.toml"), "not valid toml =").expect("write bless.toml");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--offline");
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("TOML"));
 }
 
 // ── Real-world project tests ────────────────────────────────────────

@@ -47,7 +47,6 @@ cargo bless --fix            # apply changes (creates .bak backup)
 cargo bless --update-rules   # fetch latest rules from blessed.rs
 cargo bless --json           # output suggestions as JSON
 cargo bless --offline        # skip network calls, use local cache only
-cargo bless --fail-on=high   # exit non-zero if HIGH impact suggestions found
 cargo bless --no-audit-code  # skip the default code audit
 ```
 
@@ -62,11 +61,7 @@ cargo bless --no-audit-code  # skip the default code audit
 | `--diff` | With `cargo bless bs`, audit only changed lines from `git diff HEAD` |
 | `--verbose` | Show every code-audit finding instead of the top findings summary |
 | `--json` | Output suggestions as JSON array (for CI/pipelines) |
-| `--fail-on=LEVELS` | Exit non-zero when matching severity found (e.g., `high`, `medium,high`) |
 | `--offline` | Skip crates.io/GitHub fetches, use local cache only |
-| `--workspace` | Analyze all workspace members |
-| `--package=NAME` | Only analyze specific package(s) in a workspace |
-| `--all-targets` | Include dev-dependencies and build-dependencies |
 | `--policy=PATH` | Use custom bless.toml policy file |
 | `--update-rules` | Fetch latest rules from blessed.rs |
 | `--manifest-path=PATH` | Path to Cargo.toml (defaults to current directory) |
@@ -101,7 +96,7 @@ Or pass a custom path: `cargo bless --policy=custom-bless.toml`
 ```
 $ cargo bless
 
-🔥 cargo-bless v0.1.2
+🔥 cargo-bless v0.1.3
 
 📋 Scanning dependencies...
 

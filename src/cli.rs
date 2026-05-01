@@ -30,8 +30,8 @@ pub struct BlessOpts {
     #[arg(long)]
     pub update_rules: bool,
 
-    /// Enable LLM-powered suggestions via local Ollama or API.
-    #[arg(long)]
+    /// Reserved for future machine-assisted suggestions.
+    #[arg(long, hide = true)]
     pub llm: bool,
 
     /// Path to the Cargo.toml to analyze (defaults to current directory).
@@ -51,20 +51,20 @@ pub struct BlessOpts {
     pub json: bool,
 
     /// Exit with non-zero code when a suggestion matches the given severity level(s).
-    /// Comma-separated: low, medium, high, critical. Example: --fail-on=high,critical
-    #[arg(long, value_delimiter = ',')]
+    /// Reserved severity gate. Comma-separated: low, medium, high, critical.
+    #[arg(long, value_delimiter = ',', hide = true)]
     pub fail_on: Vec<String>,
 
     /// Analyze all workspace members instead of only the root package.
-    #[arg(long)]
+    #[arg(long, hide = true)]
     pub workspace: bool,
 
     /// Only analyze the specified package(s) in a workspace. Accepts package names.
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, value_delimiter = ',', hide = true)]
     pub package: Vec<String>,
 
     /// Include dev-dependencies and build-dependencies in analysis.
-    #[arg(long)]
+    #[arg(long, hide = true)]
     pub all_targets: bool,
 
     /// Do not fetch online data; use only the local rule cache.
