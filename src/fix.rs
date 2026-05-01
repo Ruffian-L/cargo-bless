@@ -29,18 +29,13 @@ pub struct FixResult {
 /// - Creates a `.bak` backup before any edits.
 /// - Uses `toml_edit` to preserve comments and formatting.
 /// - If `dry_run` is true, prints the diff but writes nothing.
-pub fn apply(
-    suggestions: &[Suggestion],
-    manifest_path: &Path,
-    dry_run: bool,
-) -> Result<FixResult> {
+pub fn apply(suggestions: &[Suggestion], manifest_path: &Path, dry_run: bool) -> Result<FixResult> {
     let fixable: Vec<&Suggestion> = suggestions.iter().filter(|s| s.is_auto_fixable()).collect();
 
     if fixable.is_empty() {
         println!(
             "{}",
-            "ℹ️  No auto-fixable suggestions found. Manual changes recommended above."
-                .dimmed()
+            "ℹ️  No auto-fixable suggestions found. Manual changes recommended above.".dimmed()
         );
         return Ok(FixResult {
             applied: vec![],
@@ -70,14 +65,20 @@ pub fn apply(
     // Also note non-fixable suggestions as skipped
     for suggestion in suggestions {
         if !suggestion.is_auto_fixable() {
-            skipped.push(format!("{} (requires source code changes)", suggestion.current));
+            skipped.push(format!(
+                "{} (requires source code changes)",
+                suggestion.current
+            ));
         }
     }
 
     let edited = doc.to_string();
 
     if dry_run {
-        println!("🔍 {}", "Dry-run: the following changes would be made:".bold());
+        println!(
+            "🔍 {}",
+            "Dry-run: the following changes would be made:".bold()
+        );
         println!();
         print_diff(&original, &edited);
 
@@ -99,12 +100,8 @@ pub fn apply(
     } else {
         // Create backup
         let backup_path = manifest_path.with_extension("toml.bak");
-        fs::copy(manifest_path, &backup_path).with_context(|| {
-            format!(
-                "failed to create backup at {}",
-                backup_path.display()
-            )
-        })?;
+        fs::copy(manifest_path, &backup_path)
+            .with_context(|| format!("failed to create backup at {}", backup_path.display()))?;
         println!(
             "📋 Backup saved to {}",
             backup_path.display().to_string().dimmed()
@@ -144,6 +141,43 @@ pub fn apply(
             }
         }
 
+        // Run cargo check to validate the fix didn't break compilation
+        println!("{}", "🔍 Running cargo check...".dimmed());
+        let check_status = Command::new("cargo")
+            .arg("check")
+            .current_dir(
+                manifest_path
+                    .parent()
+                    .filter(|p| !p.as_os_str().is_empty())
+                    .unwrap_or_else(|| Path::new(".")),
+            )
+            .status();
+
+        match check_status {
+            Ok(s) if s.success() => {
+                println!(
+                    "{}",
+                    "✅ cargo check passed — project still compiles.".green()
+                );
+            }
+            Ok(s) => {
+                println!(
+                    "{}",
+                    format!(
+                        "⚠️  cargo check failed (exit: {}). You may need to update source code.",
+                        s
+                    )
+                    .yellow()
+                );
+            }
+            Err(e) => {
+                println!(
+                    "{}",
+                    format!("⚠️  Failed to run cargo check: {}", e).yellow()
+                );
+            }
+        }
+
         println!();
         if !applied.is_empty() {
             println!("{}", "Applied fixes:".bold().green());
@@ -168,49 +202,54 @@ pub fn apply(
 /// Returns a description of what was done on success.
 fn apply_single(doc: &mut DocumentMut, suggestion: &Suggestion) -> Result<String> {
     match suggestion.kind {
-        SuggestionKind::StdReplacement => apply_remove(doc, &suggestion.current, &suggestion.recommended),
-        SuggestionKind::Unmaintained => apply_rename(doc, &suggestion.current, &suggestion.recommended),
-        SuggestionKind::FeatureOptimization => apply_feature_opt(doc, &suggestion.current, &suggestion.recommended),
+        SuggestionKind::StdReplacement => {
+            apply_remove(doc, &suggestion.current, &suggestion.recommended)
+        }
+        SuggestionKind::Unmaintained => {
+            apply_rename(doc, &suggestion.current, &suggestion.recommended)
+        }
+        SuggestionKind::FeatureOptimization => {
+            apply_feature_opt(doc, &suggestion.current, &suggestion.recommended)
+        }
         _ => anyhow::bail!("not auto-fixable"),
     }
 }
 
 /// Remove a dependency (StdReplacement: crate replaced by std).
+/// Searches [dependencies], [dev-dependencies], and [build-dependencies].
 fn apply_remove(doc: &mut DocumentMut, crate_name: &str, replacement: &str) -> Result<String> {
-    let deps = doc
-        .get_mut("dependencies")
-        .and_then(|d| d.as_table_like_mut())
-        .ok_or_else(|| anyhow::anyhow!("no [dependencies] table found"))?;
-
-    if deps.remove(crate_name).is_some() {
-        Ok(format!(
-            "Removed `{}` (use {} instead)",
-            crate_name, replacement
-        ))
-    } else {
-        anyhow::bail!("`{}` not found in [dependencies]", crate_name)
+    for section in ["dependencies", "dev-dependencies", "build-dependencies"] {
+        if let Some(deps) = doc.get_mut(section).and_then(|d| d.as_table_like_mut()) {
+            if deps.remove(crate_name).is_some() {
+                return Ok(format!(
+                    "Removed `{}` from [{}] (use {} instead)",
+                    crate_name, section, replacement
+                ));
+            }
+        }
     }
+    anyhow::bail!("`{}` not found in any dependency section", crate_name)
 }
 
 /// Rename a dependency (Unmaintained: swap to maintained fork).
+/// Searches [dependencies], [dev-dependencies], and [build-dependencies].
 fn apply_rename(doc: &mut DocumentMut, old_name: &str, new_name: &str) -> Result<String> {
-    let deps = doc
-        .get_mut("dependencies")
-        .and_then(|d| d.as_table_like_mut())
-        .ok_or_else(|| anyhow::anyhow!("no [dependencies] table found"))?;
-
-    // Get the old entry's value
-    let old_item = deps
-        .remove(old_name)
-        .ok_or_else(|| anyhow::anyhow!("`{}` not found in [dependencies]", old_name))?;
-
-    // Insert with new name, preserving the version/features config
-    deps.insert(new_name, old_item);
-
-    Ok(format!("Renamed `{}` → `{}`", old_name, new_name))
+    for section in ["dependencies", "dev-dependencies", "build-dependencies"] {
+        if let Some(deps) = doc.get_mut(section).and_then(|d| d.as_table_like_mut()) {
+            if let Some(old_item) = deps.remove(old_name) {
+                deps.insert(new_name, old_item);
+                return Ok(format!(
+                    "Renamed `{}` → `{}` in [{}]",
+                    old_name, new_name, section
+                ));
+            }
+        }
+    }
+    anyhow::bail!("`{}` not found in any dependency section", old_name)
 }
 
 /// Feature optimization: remove extra dep, add feature to the main dep.
+/// Searches [dependencies], [dev-dependencies], and [build-dependencies].
 /// Pattern format: "main_crate+extra_crate" → "main_crate with \"feature\" feature"
 fn apply_feature_opt(doc: &mut DocumentMut, pattern: &str, recommended: &str) -> Result<String> {
     let parts: Vec<&str> = pattern.split('+').collect();
@@ -225,23 +264,41 @@ fn apply_feature_opt(doc: &mut DocumentMut, pattern: &str, recommended: &str) ->
     let feature_name = extract_feature_name(recommended)
         .ok_or_else(|| anyhow::anyhow!("could not parse feature name from '{}'", recommended))?;
 
-    let deps = doc
-        .get_mut("dependencies")
-        .and_then(|d| d.as_table_like_mut())
-        .ok_or_else(|| anyhow::anyhow!("no [dependencies] table found"))?;
+    let sections = ["dependencies", "dev-dependencies", "build-dependencies"];
 
-    // Remove the extra crate
-    if deps.remove(extra_crate).is_none() {
-        anyhow::bail!("`{}` not found in [dependencies]", extra_crate);
+    // Find the extra crate in any section and remove it
+    let mut extra_removed_section = None;
+    for section in &sections {
+        if let Some(deps) = doc.get_mut(section).and_then(|d| d.as_table_like_mut()) {
+            if deps.remove(extra_crate).is_some() {
+                extra_removed_section = Some(*section);
+                break;
+            }
+        }
     }
 
-    // Add the feature to the main crate
-    add_feature_to_dep(deps, main_crate, &feature_name)?;
+    if extra_removed_section.is_none() {
+        anyhow::bail!("`{}` not found in any dependency section", extra_crate);
+    }
 
-    Ok(format!(
-        "Removed `{}`, enabled `{}` feature on `{}`",
-        extra_crate, feature_name, main_crate
-    ))
+    // Find the main crate in any section and add the feature
+    for section in &sections {
+        if let Some(deps) = doc.get_mut(section).and_then(|d| d.as_table_like_mut()) {
+            if deps.get(main_crate).is_some() {
+                add_feature_to_dep(deps, main_crate, &feature_name)?;
+                return Ok(format!(
+                    "Removed `{}` from [{}], enabled `{}` feature on `{}` in [{}]",
+                    extra_crate,
+                    extra_removed_section.unwrap(),
+                    feature_name,
+                    main_crate,
+                    section
+                ));
+            }
+        }
+    }
+
+    anyhow::bail!("`{}` not found in any dependency section", main_crate)
 }
 
 /// Extract feature name from a recommendation string like 'reqwest with "json" feature'.
@@ -422,9 +479,12 @@ reqwest = "0.12"
 serde_json = "1.0"
 "#;
         let mut doc: DocumentMut = toml.parse().unwrap();
-        let result =
-            apply_feature_opt(&mut doc, "reqwest+serde_json", r#"reqwest with "json" feature"#)
-                .unwrap();
+        let result = apply_feature_opt(
+            &mut doc,
+            "reqwest+serde_json",
+            r#"reqwest with "json" feature"#,
+        )
+        .unwrap();
 
         assert!(result.contains("Removed `serde_json`"));
         assert!(result.contains("enabled `json` feature on `reqwest`"));
@@ -446,9 +506,12 @@ reqwest = { version = "0.12", features = ["blocking"] }
 serde_json = "1.0"
 "#;
         let mut doc: DocumentMut = toml.parse().unwrap();
-        let result =
-            apply_feature_opt(&mut doc, "reqwest+serde_json", r#"reqwest with "json" feature"#)
-                .unwrap();
+        let result = apply_feature_opt(
+            &mut doc,
+            "reqwest+serde_json",
+            r#"reqwest with "json" feature"#,
+        )
+        .unwrap();
 
         assert!(result.contains("Removed `serde_json`"));
         let edited = doc.to_string();
@@ -566,5 +629,98 @@ serde = "1.0"
         let result = apply(&suggestions, &manifest, true).unwrap();
         assert!(result.applied.is_empty());
         assert_eq!(result.skipped.len(), 1);
+    }
+
+    #[test]
+    fn test_remove_from_dev_dependencies() {
+        let toml = r#"
+[package]
+name = "test-project"
+version = "0.1.0"
+
+[dependencies]
+serde = "1.0"
+
+[dev-dependencies]
+lazy_static = "1.5"
+"#;
+        let mut doc: DocumentMut = toml.parse().unwrap();
+        let result = apply_remove(&mut doc, "lazy_static", "std::sync::LazyLock").unwrap();
+
+        assert!(result.contains("Removed `lazy_static`"));
+        assert!(result.contains("[dev-dependencies]"));
+        let edited = doc.to_string();
+        assert!(!edited.contains("lazy_static"));
+        assert!(edited.contains("serde"));
+    }
+
+    #[test]
+    fn test_remove_from_build_dependencies() {
+        let toml = r#"
+[package]
+name = "test-project"
+version = "0.1.0"
+
+[dependencies]
+serde = "1.0"
+
+[build-dependencies]
+lazy_static = "1.5"
+"#;
+        let mut doc: DocumentMut = toml.parse().unwrap();
+        let result = apply_remove(&mut doc, "lazy_static", "std::sync::LazyLock").unwrap();
+
+        assert!(result.contains("[build-dependencies]"));
+        let edited = doc.to_string();
+        assert!(!edited.contains("lazy_static"));
+    }
+
+    #[test]
+    fn test_rename_from_dev_dependencies() {
+        let toml = r#"
+[package]
+name = "test-project"
+version = "0.1.0"
+
+[dev-dependencies]
+memmap = "0.7"
+"#;
+        let mut doc: DocumentMut = toml.parse().unwrap();
+        let result = apply_rename(&mut doc, "memmap", "memmap2").unwrap();
+
+        assert!(result.contains("Renamed `memmap` → `memmap2`"));
+        assert!(result.contains("[dev-dependencies]"));
+        let edited = doc.to_string();
+        assert!(!edited.contains("memmap ="));
+        assert!(edited.contains("memmap2"));
+    }
+
+    #[test]
+    fn test_feature_opt_across_sections() {
+        let toml = r#"
+[package]
+name = "test-project"
+version = "0.1.0"
+
+[dependencies]
+reqwest = "0.12"
+
+[dev-dependencies]
+serde_json = "1.0"
+"#;
+        let mut doc: DocumentMut = toml.parse().unwrap();
+        let result = apply_feature_opt(
+            &mut doc,
+            "reqwest+serde_json",
+            r#"reqwest with "json" feature"#,
+        )
+        .unwrap();
+
+        assert!(result.contains("Removed `serde_json`"));
+        assert!(result.contains("[dev-dependencies]"));
+        assert!(result.contains("enabled `json` feature on `reqwest` in [dependencies]"));
+        let edited = doc.to_string();
+        assert!(!edited.contains("serde_json"));
+        assert!(edited.contains("json"));
     }
 }

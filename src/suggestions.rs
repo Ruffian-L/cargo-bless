@@ -108,6 +108,7 @@ pub fn load_rules() -> Vec<Rule> {
     }
 }
 
+use std::fs;
 /// Analyze resolved dependencies against the rule database.
 ///
 /// Matching strategies:
@@ -115,9 +116,12 @@ pub fn load_rules() -> Vec<Rule> {
 /// - **Combo** rules (pattern contains `+`): fire if ALL named crates are present
 ///   as direct deps.
 use std::path::Path;
-use std::fs;
 
-pub fn analyze(manifest_path: Option<&Path>, deps: &[ResolvedDep], rules: &[Rule]) -> Vec<Suggestion> {
+pub fn analyze(
+    manifest_path: Option<&Path>,
+    deps: &[ResolvedDep],
+    rules: &[Rule],
+) -> Vec<Suggestion> {
     let direct_names: HashSet<&str> = deps
         .iter()
         .filter(|d| d.is_direct)
@@ -129,7 +133,8 @@ pub fn analyze(manifest_path: Option<&Path>, deps: &[ResolvedDep], rules: &[Rule
     for rule in rules {
         let matched = if rule.pattern.contains('+') {
             // Combo rule: all named crates must be present
-            let all_present = rule.pattern
+            let all_present = rule
+                .pattern
                 .split('+')
                 .all(|name| direct_names.contains(name.trim()));
 
@@ -237,7 +242,11 @@ mod tests {
     #[test]
     fn test_load_rules() {
         let rules = load_rules();
-        assert!(rules.len() >= 15, "should load at least 15 rules, got {}", rules.len());
+        assert!(
+            rules.len() >= 15,
+            "should load at least 15 rules, got {}",
+            rules.len()
+        );
 
         // Spot-check a known rule
         let lazy = rules.iter().find(|r| r.pattern == "lazy_static").unwrap();
@@ -252,7 +261,8 @@ mod tests {
             ResolvedDep {
                 name: "lazy_static".into(),
                 version: "1.5.0".into(),
-                features: vec![],
+                enabled_features: vec![],
+                available_features: vec![],
                 source: Some("registry".into()),
                 repository: None,
                 is_direct: true,
@@ -260,7 +270,8 @@ mod tests {
             ResolvedDep {
                 name: "serde".into(),
                 version: "1.0.0".into(),
-                features: vec![],
+                enabled_features: vec![],
+                available_features: vec![],
                 source: Some("registry".into()),
                 repository: None,
                 is_direct: true,
@@ -280,7 +291,8 @@ mod tests {
             ResolvedDep {
                 name: "reqwest".into(),
                 version: "0.12.0".into(),
-                features: vec![],
+                enabled_features: vec![],
+                available_features: vec![],
                 source: Some("registry".into()),
                 repository: None,
                 is_direct: true,
@@ -289,7 +301,8 @@ mod tests {
                 // Use a crate name that definitely isn't used in this test file
                 name: "some_unused_crate".into(),
                 version: "1.0.0".into(),
-                features: vec![],
+                enabled_features: vec![],
+                available_features: vec![],
                 source: Some("registry".into()),
                 repository: None,
                 is_direct: true,
@@ -309,7 +322,10 @@ mod tests {
         let suggestions = analyze(None, &deps, &[custom_rule]);
         assert_eq!(suggestions.len(), 1);
         assert_eq!(suggestions[0].current, "reqwest+some_unused_crate");
-        assert!(matches!(suggestions[0].kind, SuggestionKind::FeatureOptimization));
+        assert!(matches!(
+            suggestions[0].kind,
+            SuggestionKind::FeatureOptimization
+        ));
         assert_eq!(suggestions[0].impact, Impact::Low);
     }
 
@@ -320,7 +336,8 @@ mod tests {
         let deps = vec![ResolvedDep {
             name: "reqwest".into(),
             version: "0.12.0".into(),
-            features: vec![],
+            enabled_features: vec![],
+            available_features: vec![],
             source: Some("registry".into()),
             repository: None,
             is_direct: true,
@@ -339,7 +356,8 @@ mod tests {
         let deps = vec![ResolvedDep {
             name: "lazy_static".into(),
             version: "1.5.0".into(),
-            features: vec![],
+            enabled_features: vec![],
+            available_features: vec![],
             source: Some("registry".into()),
             repository: None,
             is_direct: false, // transitive — should be ignored
@@ -359,7 +377,8 @@ mod tests {
             ResolvedDep {
                 name: "lazy_static".into(),
                 version: "1.5.0".into(),
-                features: vec![],
+                enabled_features: vec![],
+                available_features: vec![],
                 source: Some("registry".into()),
                 repository: None,
                 is_direct: true,
@@ -367,7 +386,8 @@ mod tests {
             ResolvedDep {
                 name: "structopt".into(),
                 version: "0.3.0".into(),
-                features: vec![],
+                enabled_features: vec![],
+                available_features: vec![],
                 source: Some("registry".into()),
                 repository: None,
                 is_direct: true,
@@ -375,7 +395,8 @@ mod tests {
             ResolvedDep {
                 name: "memmap".into(),
                 version: "0.7.0".into(),
-                features: vec![],
+                enabled_features: vec![],
+                available_features: vec![],
                 source: Some("registry".into()),
                 repository: None,
                 is_direct: true,
@@ -399,7 +420,8 @@ mod tests {
             ResolvedDep {
                 name: "clap".into(),
                 version: "4.5.0".into(),
-                features: vec!["derive".into()],
+                enabled_features: vec!["derive".into()],
+                available_features: vec![],
                 source: Some("registry".into()),
                 repository: None,
                 is_direct: true,
@@ -407,7 +429,8 @@ mod tests {
             ResolvedDep {
                 name: "serde".into(),
                 version: "1.0.0".into(),
-                features: vec!["derive".into()],
+                enabled_features: vec!["derive".into()],
+                available_features: vec![],
                 source: Some("registry".into()),
                 repository: None,
                 is_direct: true,
@@ -415,15 +438,24 @@ mod tests {
         ];
 
         let suggestions = analyze(None, &deps, &rules);
-        assert!(suggestions.is_empty(), "modern deps should not trigger any suggestions");
+        assert!(
+            suggestions.is_empty(),
+            "modern deps should not trigger any suggestions"
+        );
     }
 
     #[test]
     fn test_impact_derivation() {
         assert_eq!(impact_for(&SuggestionKind::Unmaintained), Impact::High);
         assert_eq!(impact_for(&SuggestionKind::StdReplacement), Impact::High);
-        assert_eq!(impact_for(&SuggestionKind::ModernAlternative), Impact::Medium);
+        assert_eq!(
+            impact_for(&SuggestionKind::ModernAlternative),
+            Impact::Medium
+        );
         assert_eq!(impact_for(&SuggestionKind::ComboWin), Impact::Medium);
-        assert_eq!(impact_for(&SuggestionKind::FeatureOptimization), Impact::Low);
+        assert_eq!(
+            impact_for(&SuggestionKind::FeatureOptimization),
+            Impact::Low
+        );
     }
 }
