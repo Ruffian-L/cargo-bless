@@ -2,11 +2,12 @@
 
 All notable changes to `cargo-bless` are logged here.
 
-## 0.1.5 (2026-05-02 — release when published to crates.io)
+## 0.1.5 (2026-05-02)
 
+- Published to [crates.io](https://crates.io/crates/cargo-bless/0.1.5). GitHub: [PR #26](https://github.com/Ruffian-L/cargo-bless/pull/26) (squash-merged to `main`).
 - Added `cargo bless --feedback`: prints a voluntary, paste-friendly summary block (version, dep counts, suggestion counts, high-impact count, code-audit totals, ranked hotspots) without network calls — useful for GitHub issues without telemetry.
 - Relaxed wording for the `chrono` ↔ `time` rule in `data/suggestions.json`: frames `time` as something to evaluate, explicitly not a mandate to replace `chrono`.
-- Documented release framing (0.1.4 as first “ strangers might try it” milestone), roadmap sketch for **0.1.5** (trust polish) vs **0.2.0** (policy boundary), docs.rs link, and README section for `--feedback`.
+- Documented release framing (0.1.4 as first “strangers might try it” milestone), roadmap sketch for **0.1.5** (trust polish) vs **0.2.0** (policy boundary), docs.rs link, and README section for `--feedback`.
 
 ## Earlier releases
 
