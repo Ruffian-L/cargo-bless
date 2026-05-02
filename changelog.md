@@ -9,6 +9,7 @@ All notable changes to `cargo-bless` are logged here.
 - **`--fail-on`:** Exit non-zero when any retained suggestion’s **impact** matches **`low`** / **`medium`** / **`high`** / **`critical`** (**critical aliases high** for dependency tier until code-audit gating arrives).
 - **JSON breaking layout:** **`cargo_bless_version`**, **`workspace_scan`**, **`packages[]`**, per-package **`dependency_suggestions`**, nullable **`code_audit`**; **`cargo bless bs --json`** uses **`packages: []`** + audit blob.
 - **Fix trust copy:** **`--dry-run`** / **`--fix`** Cargo.toml-only messaging across README + `main` banners + **`fix::apply`** stderr + modernization footer.
+- **README visuals:** shields + hero/pipeline PNGs (under **`docs/images/`**, readme links use **raw.githubusercontent.com** so [crates.io](https://crates.io/) README renders images), Mermaid pipeline & command-picker flows, workspace mock output, **`--json`** / **`--fail-on`** Action snippet, autofix **`Cargo.toml`** before/after.
 
 ## 0.1.8 (2026-05-02)
 
