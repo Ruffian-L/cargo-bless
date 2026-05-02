@@ -135,6 +135,21 @@ fn get_cache_path() -> Option<PathBuf> {
 
 // ── Converter ────────────────────────────────────────────────────────
 
+/// Strip simple HTML tags from blessed.rs notes (links, line breaks).
+fn strip_html(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut in_tag = false;
+    for ch in s.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => result.push(ch),
+            _ => {}
+        }
+    }
+    result
+}
+
 /// Convert blessed.rs data into cargo-bless rules.
 ///
 /// For each purpose with 2+ recommendations, the first is "preferred"
@@ -150,20 +165,20 @@ fn convert_to_rules(data: &BlessedData) -> Vec<Rule> {
                 }
 
                 let preferred = &purpose.recommendations[0];
-                let purpose_notes = purpose.notes.as_deref().unwrap_or("");
+                let purpose_clean = strip_html(purpose.notes.as_deref().unwrap_or(""));
 
                 for alt in &purpose.recommendations[1..] {
-                    let alt_notes = alt.notes.as_deref().unwrap_or("");
+                    let alt_clean = strip_html(alt.notes.as_deref().unwrap_or(""));
 
                     // Only generate a rule if there's a clear migration signal.
                     // Without this filter, co-equal alternatives (e.g. insta vs
                     // cargo-nextest, tokio vs crossbeam-channel) create false positives.
-                    if !has_migration_signal(purpose_notes, alt_notes) {
+                    if !has_migration_signal(&purpose_clean, &alt_clean) {
                         continue;
                     }
 
-                    let kind = infer_kind(purpose_notes, alt_notes);
-                    let reason = build_reason(purpose_notes, alt_notes, &purpose.name);
+                    let kind = infer_kind(&purpose_clean, &alt_clean);
+                    let reason = build_reason(&purpose_clean, &alt_clean, &purpose.name);
 
                     rules.push(Rule {
                         pattern: alt.name.clone(),
@@ -187,27 +202,52 @@ fn convert_to_rules(data: &BlessedData) -> Vec<Rule> {
 
 /// Check if the notes contain a clear signal that the alternative should
 /// be migrated away from (rather than just being a co-equal option).
+///
+/// Tuned against [blessed.rs](https://blessed.rs/) / `crates.json` wording: bare
+/// **`simpler`** is *not* enough (e.g. flume describes itself as "simpler than
+/// crossbeam-channel" but should not flip direction; color-eyre says anyhow is
+/// "**simpler**" for other use cases but is not deprecating color-eyre).
 fn has_migration_signal(purpose_notes: &str, alt_notes: &str) -> bool {
-    let combined = format!("{} {}", purpose_notes, alt_notes).to_lowercase();
+    let combined = format!("{purpose_notes} {alt_notes}").to_lowercase();
 
-    let signals = [
-        "older",
-        "simpler",
-        "less convenient",
-        "superseded",
+    const CORE: &[&str] = &[
         "unmaintained",
         "deprecated",
+        "superseded",
         "archived",
-        "standard library",
+        "legacy",
+        "maintenance mode",
+        "inactive",
+        "no longer maintained",
+        "obsolete",
+        "older crate",
+        "an older",
+        "older and",
+        "less convenient",
+        "included in standard library",
         "included in std",
         "adopted into",
-        "no longer maintained",
         "not recommended",
-        "legacy",
-        "prefer",
     ];
 
-    signals.iter().any(|s| combined.contains(s))
+    if CORE.iter().any(|s| combined.contains(s)) {
+        return true;
+    }
+
+    // Blessed often positions one crate as today's default (e.g. tracing for logging).
+    if combined.contains("go-to") || combined.contains("now the ") {
+        return true;
+    }
+
+    // "simpler" only with enough context to avoid spurious direction flips.
+    if combined.contains("simpler") {
+        return combined.contains("older")
+            || combined.contains("games")
+            || combined.contains("2d ")
+            || combined.contains("verbosity");
+    }
+
+    false
 }
 
 /// Infer the suggestion kind from notes.
@@ -240,8 +280,8 @@ fn build_reason(purpose_notes: &str, alt_notes: &str, purpose_name: &str) -> Str
         ""
     };
 
-    // Strip HTML tags from blessed.rs notes
-    let clean = strip_html(note);
+    // Notes are already stripped of HTML in convert_to_rules.
+    let clean = note.trim();
 
     if clean.is_empty() {
         format!(
@@ -251,23 +291,8 @@ fn build_reason(purpose_notes: &str, alt_notes: &str, purpose_name: &str) -> Str
     } else if clean.len() > 120 {
         format!("{}...", &clean[..117])
     } else {
-        clean
+        clean.to_string()
     }
-}
-
-/// Strip simple HTML tags from blessed.rs notes.
-fn strip_html(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    let mut in_tag = false;
-    for ch in s.chars() {
-        match ch {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => result.push(ch),
-            _ => {}
-        }
-    }
-    result
 }
 
 #[cfg(test)]
@@ -306,6 +331,26 @@ mod tests {
     fn test_infer_kind_default() {
         let kind = infer_kind("", "A simpler alternative");
         assert_eq!(kind, crate::suggestions::SuggestionKind::ModernAlternative);
+    }
+
+    #[test]
+    fn test_migration_signal_rejects_flume_spurious_simpler() {
+        let alt = "Smaller and simpler than crossbeam-channel and almost as fast";
+        assert!(!has_migration_signal("", alt));
+    }
+
+    #[test]
+    fn test_migration_signal_rejects_color_eyre_otherwise_simpler() {
+        let alt = "A fork of anyhow that gives you more control over the format of the generated error messages. Recommended if you intend to present error messages to end users. Otherwise anyhow is simpler.";
+        assert!(!has_migration_signal("", alt));
+    }
+
+    #[test]
+    fn test_migration_signal_accepts_ggez_games_context() {
+        assert!(has_migration_signal(
+            "",
+            "A simpler option for 2d games only."
+        ));
     }
 
     #[test]
@@ -436,8 +481,8 @@ mod tests {
     fn test_live_update() {
         let rules = update_rules().expect("should fetch and convert");
         assert!(
-            rules.len() > 5,
-            "should generate migration rules, got {}",
+            rules.len() >= 3,
+            "expected a small set of high-confidence blessed migration rows, got {}",
             rules.len()
         );
         println!("Generated {} rules from live blessed.rs", rules.len());
