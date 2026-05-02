@@ -133,37 +133,33 @@ fn default_evidence_source() -> EvidenceSource {
     EvidenceSource::Heuristic
 }
 
-/// Load suggestion rules, merging cached blessed.rs rules with the embedded fallback.
+/// Load suggestion rules from the embedded database, optionally augmented by a
+/// **fresh** local cache of blessed.rs rules.
 ///
-/// If `~/.cache/cargo-bless/blessed-rules.json` exists and is fresh,
-/// those rules take priority. Any embedded rules whose patterns are NOT
-/// covered by the blessed.rs set are appended (preserves hand-crafted
-/// combo rules and custom additions).
+/// **Merge policy:** patterns in `data/suggestions.json` (embedded at compile time)
+/// are authoritative. Cached blessed-derived rules are appended only for patterns
+/// not already defined locally — same policy as `update-suggestions`.
 pub fn load_rules() -> Vec<Rule> {
     let embedded: Vec<Rule> = {
         let json = include_str!("../data/suggestions.json");
         serde_json::from_str(json).expect("embedded suggestions.json should be valid")
     };
 
-    // Try loading cached blessed.rs rules
-    let cached = crate::updater::load_cached_rules();
+    let Some(cached_blessed) = crate::updater::load_cached_rules() else {
+        return embedded;
+    };
 
-    match cached {
-        Some(mut blessed_rules) => {
-            // Merge: blessed.rs rules first, then append embedded-only rules
-            let blessed_patterns: std::collections::HashSet<String> =
-                blessed_rules.iter().map(|r| r.pattern.clone()).collect();
+    let embedded_patterns: std::collections::HashSet<String> =
+        embedded.iter().map(|r| r.pattern.clone()).collect();
 
-            for rule in embedded {
-                if !blessed_patterns.contains(&rule.pattern) {
-                    blessed_rules.push(rule);
-                }
-            }
-
-            blessed_rules
+    let mut merged = embedded;
+    for rule in cached_blessed {
+        if !embedded_patterns.contains(&rule.pattern) {
+            merged.push(rule);
         }
-        None => embedded,
     }
+
+    merged
 }
 
 use std::fs;
