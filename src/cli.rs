@@ -41,6 +41,10 @@ pub struct BlessOpts {
     #[arg(long)]
     pub dry_run: bool,
 
+    /// Print a privacy-safe summary block suitable for pasting into issue reports (no paths to source snippets).
+    #[arg(long)]
+    pub feedback: bool,
+
     /// Fetch the latest rules from blessed.rs and update the local cache.
     #[arg(long)]
     pub update_rules: bool,

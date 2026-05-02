@@ -103,6 +103,31 @@ fn test_json_update_rules_combination_exits_nonzero() {
 }
 
 #[test]
+fn test_feedback_prints_block() {
+    cargo_bless_cmd()
+        .arg("--feedback")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("cargo-bless feedback block"))
+        .stdout(predicate::str::contains("version:"))
+        .stdout(predicate::str::contains("direct_deps:"))
+        .stdout(predicate::str::contains("code_audit_findings:"))
+        .stdout(predicate::str::contains("top_hotspots:"));
+}
+
+#[test]
+fn test_feedback_with_fix_exits_nonzero() {
+    cargo_bless_cmd()
+        .arg("--feedback")
+        .arg("--fix")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "--feedback cannot be combined with --fix",
+        ));
+}
+
+#[test]
 fn test_explicit_missing_policy_exits_nonzero() {
     cargo_bless_cmd()
         .arg("--policy")

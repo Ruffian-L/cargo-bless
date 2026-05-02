@@ -3,7 +3,7 @@
     "pattern": "chrono",
     "replacement": "time",
     "kind": "ModernAlternative",
-    "reason": "time is a strong modern option for smaller/simple datetime needs, but chrono is still maintained and may be correct for timezone-heavy projects",
+    "reason": "Consider evaluating the `time` crate for simpler datetime needs — not a mandate to replace `chrono`; chrono remains maintained and is often correct for timezone-heavy work",
     "source": "blessed.rs",
     "condition": "UTC-only or simple datetime usage",
     "confidence": "Low",

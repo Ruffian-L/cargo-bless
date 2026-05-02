@@ -22,6 +22,9 @@ fn main() -> Result<()> {
 fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
     reject_invalid_flag_combinations(&opts)?;
     reject_unfinished_flags(&opts)?;
+    if opts.feedback {
+        return run_feedback_command(opts);
+    }
     let manifest = opts.manifest_path.as_deref();
     let run_code_audit = opts.audit_code;
     let policy = load_policy(opts.policy.as_deref(), manifest)?;
@@ -177,6 +180,32 @@ fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
     Ok(())
 }
 
+fn run_feedback_command(opts: cli::BlessOpts) -> Result<()> {
+    let manifest = opts.manifest_path.as_deref();
+    let policy = load_policy(opts.policy.as_deref(), manifest)?;
+    let code_audit_config = cargo_bless::code_audit::config_from_policy(policy.as_ref());
+
+    let deps = cargo_bless::parser::get_deps(manifest)?;
+    let direct_count = deps.iter().filter(|d| d.is_direct).count();
+
+    let rules = cargo_bless::suggestions::load_rules();
+    let suggestions = apply_policy(
+        cargo_bless::suggestions::analyze(manifest, &deps, &rules),
+        policy.as_ref(),
+    );
+
+    let report = cargo_bless::code_audit::scan_project(manifest, &code_audit_config)?;
+
+    cargo_bless::feedback::emit_feedback_stdout(
+        env!("CARGO_PKG_VERSION"),
+        manifest,
+        direct_count,
+        deps.len(),
+        &suggestions,
+        &report,
+    )
+}
+
 fn run_code_audit_command(opts: cli::CodeAuditOpts) -> Result<()> {
     let manifest = opts.manifest_path.as_deref();
     let policy = load_policy(opts.policy.as_deref(), manifest)?;
@@ -233,6 +262,23 @@ fn apply_policy(
 }
 
 fn reject_invalid_flag_combinations(opts: &cli::BlessOpts) -> Result<()> {
+    if opts.feedback {
+        if opts.fix {
+            bail!("--feedback cannot be combined with --fix");
+        }
+        if opts.dry_run {
+            bail!("--feedback cannot be combined with --dry-run");
+        }
+        if opts.json {
+            bail!("--feedback cannot be combined with --json");
+        }
+        if opts.update_rules {
+            bail!("--feedback cannot be combined with --update-rules");
+        }
+        if opts.audit_code {
+            bail!("--feedback always includes the code audit; do not combine with --audit-code");
+        }
+    }
     if opts.dry_run && !opts.fix {
         bail!("--dry-run requires --fix");
     }
