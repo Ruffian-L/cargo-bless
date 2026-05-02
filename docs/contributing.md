@@ -17,6 +17,8 @@ Suggestions ship from `data/suggestions.json`. Run **`cargo run --bin update-sug
 
 Embedded metadata (`confidence`, `migration_risk`, `autofix_safety`) should stay honest on hand-edited rows.
 
+To eyeball blessed.rs tone against the live site (outside of `crates.json` alone), **`firecrawl scrape https://blessed.rs/`** (or `/crates`) is a quick way to snapshot the human-facing directory; source of truth for automation remains `https://github.com/nicoburns/blessed-rs/raw/main/data/crates.json`.
+
 ## Documentation & releases
 
 1. **Before** tagging or `cargo publish`: update `README.md`, this `docs/` tree as needed, and `changelog.md`.
