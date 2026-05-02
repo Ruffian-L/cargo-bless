@@ -9,7 +9,7 @@
 
 use std::fs;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Output};
 
 use anyhow::{Context, Result};
 use colored::*;
@@ -111,64 +111,21 @@ pub fn apply(suggestions: &[Suggestion], manifest_path: &Path, dry_run: bool) ->
         fs::write(manifest_path, &edited)
             .with_context(|| format!("failed to write {}", manifest_path.display()))?;
 
-        // Run cargo update
-        println!("{}", "📦 Running cargo update...".dimmed());
-        let status = Command::new("cargo")
-            .arg("update")
-            .arg("--manifest-path")
-            .arg(manifest_path)
-            .status();
+        run_cargo_validation(
+            "cargo update",
+            "📦 Running cargo update...",
+            "✅ cargo update completed successfully.",
+            &["update", "--manifest-path"],
+            manifest_path,
+        );
 
-        match status {
-            Ok(s) if s.success() => {
-                println!("{}", "✅ cargo update completed successfully.".green());
-            }
-            Ok(s) => {
-                println!(
-                    "{}",
-                    format!("⚠️  cargo update exited with: {}", s).yellow()
-                );
-            }
-            Err(e) => {
-                println!(
-                    "{}",
-                    format!("⚠️  Failed to run cargo update: {}", e).yellow()
-                );
-            }
-        }
-
-        // Run cargo check to validate the fix didn't break compilation
-        println!("{}", "🔍 Running cargo check...".dimmed());
-        let check_status = Command::new("cargo")
-            .arg("check")
-            .arg("--manifest-path")
-            .arg(manifest_path)
-            .status();
-
-        match check_status {
-            Ok(s) if s.success() => {
-                println!(
-                    "{}",
-                    "✅ cargo check passed — project still compiles.".green()
-                );
-            }
-            Ok(s) => {
-                println!(
-                    "{}",
-                    format!(
-                        "⚠️  cargo check failed (exit: {}). You may need to update source code.",
-                        s
-                    )
-                    .yellow()
-                );
-            }
-            Err(e) => {
-                println!(
-                    "{}",
-                    format!("⚠️  Failed to run cargo check: {}", e).yellow()
-                );
-            }
-        }
+        run_cargo_validation(
+            "cargo check",
+            "🔍 Running cargo check...",
+            "✅ cargo check passed — project still compiles.",
+            &["check", "--manifest-path"],
+            manifest_path,
+        );
 
         println!();
         if !applied.is_empty() {
@@ -188,6 +145,53 @@ pub fn apply(suggestions: &[Suggestion], manifest_path: &Path, dry_run: bool) ->
     }
 
     Ok(FixResult { applied, skipped })
+}
+
+fn run_cargo_validation(
+    command_name: &str,
+    start_message: &str,
+    success_message: &str,
+    args: &[&str],
+    manifest_path: &Path,
+) {
+    println!("{}", start_message.dimmed());
+    let output = Command::new("cargo").args(args).arg(manifest_path).output();
+
+    match output {
+        Ok(output) if output.status.success() => {
+            println!("{}", success_message.green());
+        }
+        Ok(output) => {
+            println!(
+                "{}",
+                format!(
+                    "⚠️  {command_name} exited with {}. Run `{command_name} --manifest-path {}` for details.",
+                    output.status,
+                    manifest_path.display()
+                )
+                .yellow()
+            );
+            if let Some(summary) = validation_summary(&output) {
+                println!("   {}", summary.dimmed());
+            }
+        }
+        Err(err) => {
+            println!(
+                "{}",
+                format!("⚠️  Failed to run {command_name}: {err}").yellow()
+            );
+        }
+    }
+}
+
+fn validation_summary(output: &Output) -> Option<String> {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    stderr
+        .lines()
+        .chain(String::from_utf8_lossy(&output.stdout).lines())
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(str::to_string)
 }
 
 /// Apply a single suggestion to the TOML document.
