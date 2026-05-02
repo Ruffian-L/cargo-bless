@@ -2,7 +2,7 @@
 
 A Cargo subcommand that checks your dependencies against [blessed.rs](https://blessed.rs/) recommendations and suggests modern alternatives.
 
-API reference: [cargo-bless on docs.rs](https://docs.rs/cargo-bless).
+**On crates.io:** [cargo-bless](https://crates.io/crates/cargo-bless) · **Generated API docs:** [docs.rs/cargo-bless](https://docs.rs/cargo-bless) · **Changelog:** [changelog.md](https://github.com/Ruffian-L/cargo-bless/blob/main/changelog.md) · **Repo docs:** [`docs/`](https://github.com/Ruffian-L/cargo-bless/tree/main/docs)
 
 `cargo-bless` checks whether your Rust dependency tree is modern, boring, and defensible.
 
@@ -13,11 +13,13 @@ API reference: [cargo-bless on docs.rs](https://docs.rs/cargo-bless).
 | **0.1.0** | Birth |
 | **0.1.1–0.1.3** | Rapid hardening |
 | **0.1.4** | First “people might actually try this” slice — think *how does a stranger feel after running this once?* |
+| **0.1.5** | Stranger-trust polish shipped: `cargo bless --feedback`, softer `chrono` ↔ `time` copy, root changelog |
+| **0.1.6** | Documentation pass: README links, `docs/` index (architecture, CLI, contributing) |
 
 **Likely near-term forks:**
 
-- **0.1.5** — “stranger trust” polish: clearer copy, `--feedback` pasteables, tighter `--fix` disclaimers.
-- **0.2.0** — Policy / config maturity: fuller `bless.toml` fields, failure gates, workspace coverage, offline-first behavior.
+- **0.1.x** — Residual polish: optional `--summary`, even safer `--fix` wording, example “stress test” output in docs.
+- **0.2.0** — Policy / config maturity: fuller `bless.toml` semantics, fail-on gates, workspace handling, cache-first behavior (see [phase 3 design](https://github.com/Ruffian-L/cargo-bless/blob/main/docs/phase3-workspace-design.md)).
 
 ## What it does
 
@@ -84,13 +86,13 @@ cargo bless --audit-code     # include code audit in the main report
 
 ### Pasteable feedback (`--feedback`)
 
-Tried cargo-bless on a non-trivial tree? Paste the output of **`cargo bless --feedback`** into a GitHub issue. It prints aggregate counts plus coarsely-ranked source locations (`path::fn` where we can infer a function); it does **not** list crate names from your dependency graph or cargo-bless’s suggestion text — no telemetry runs.
+Tried cargo-bless on a non-trivial tree? Paste the output of **`cargo bless --feedback`** into a GitHub issue. It prints aggregate counts plus coarsely-ranked source locations (`path::fn` where we can infer a function from the finding line); it does **not** list crate names from your dependency graph or cargo-bless’s suggestion text. **No network:** this mode skips live intel; it still runs the full local code audit. **`--manifest-path`** and **`--policy`** apply the same as a normal run.
 
 Example shape:
 
 ```
 cargo-bless feedback block
-version: 0.1.5
+version: 0.1.6
 direct_deps: 46
 total_deps: 624
 suggestions: 2
@@ -131,7 +133,7 @@ Or pass a custom path: `cargo bless --policy=custom-bless.toml`
 ```
 $ cargo bless --audit-code
 
-🔥 cargo-bless v0.1.5
+🔥 cargo-bless v0.1.6
 
 📋 Scanning dependencies...
 
@@ -223,6 +225,15 @@ Before any write, `--fix` creates a `Cargo.toml.bak` backup and runs `cargo upda
 6. `toml_edit` applies fixes while preserving comments and formatting
 
 Network calls are non-fatal — if you're offline, the rule-based report still works.
+
+## Extended documentation
+
+These files also live under `docs/` in the repository (links work from GitHub and crates.io):
+
+- [Documentation index](https://github.com/Ruffian-L/cargo-bless/tree/main/docs) — `docs/README.md`
+- [Architecture](https://github.com/Ruffian-L/cargo-bless/blob/main/docs/architecture.md) — module map and pipeline
+- [CLI reference](https://github.com/Ruffian-L/cargo-bless/blob/main/docs/cli-reference.md) — flags and subcommands
+- [Contributing](https://github.com/Ruffian-L/cargo-bless/blob/main/docs/contributing.md) — build, test, release checklist
 
 ## License
 

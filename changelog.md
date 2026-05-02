@@ -2,6 +2,11 @@
 
 All notable changes to `cargo-bless` are logged here.
 
+## 0.1.6 (2026-05-02)
+
+- Documentation: expanded root README (working links for crates.io/GitHub, roadmap through 0.1.6). New **`docs/`** index — [README](https://github.com/Ruffian-L/cargo-bless/blob/main/docs/README.md), [architecture](https://github.com/Ruffian-L/cargo-bless/blob/main/docs/architecture.md), [CLI reference](https://github.com/Ruffian-L/cargo-bless/blob/main/docs/cli-reference.md), [contributing](https://github.com/Ruffian-L/cargo-bless/blob/main/docs/contributing.md). Phase 3 workspace design cross-linked from `docs/`.
+- HTTP `User-Agent` for crates.io / blessed.rs fetches now uses `concat!(…, env!("CARGO_PKG_VERSION"))` so it tracks the running crate version.
+
 ## 0.1.5 (2026-05-02)
 
 - Published to [crates.io](https://crates.io/crates/cargo-bless/0.1.5). GitHub: [PR #26](https://github.com/Ruffian-L/cargo-bless/pull/26) (squash-merged to `main`).
