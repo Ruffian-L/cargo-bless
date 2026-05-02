@@ -9,7 +9,7 @@ A Cargo subcommand that checks your dependencies against [blessed.rs](https://bl
 - Scans your `Cargo.toml` dependency tree (direct + transitive, with features)
 - Matches against a built-in rule database sourced from blessed.rs
 - Detects single-crate replacements _and_ combo optimizations (e.g. dropping `serde_json` when `reqwest` has the `json` feature)
-- Runs a built-in bullshit detector code audit for suspicious Rust complexity patterns
+- Optionally runs a built-in bullshit detector code audit for suspicious Rust complexity patterns
 - Fetches live metadata from crates.io (latest version, downloads) and GitHub (last push, archived status)
 - Optionally applies safe fixes to your `Cargo.toml` with `--fix` (preview first with `--dry-run`)
 
@@ -47,7 +47,7 @@ cargo bless --fix            # apply changes (creates .bak backup)
 cargo bless --update-rules   # fetch latest rules from blessed.rs
 cargo bless --json           # output suggestions as JSON
 cargo bless --offline        # skip network calls, use local cache only
-cargo bless --no-audit-code  # skip the default code audit
+cargo bless --audit-code     # include code audit in the main report
 ```
 
 ### CLI Flags
@@ -56,8 +56,7 @@ cargo bless --no-audit-code  # skip the default code audit
 |------|-------------|
 | `--fix` | Apply auto-fixable suggestions to Cargo.toml |
 | `--dry-run` | Preview changes without writing (use with `--fix`) |
-| `--audit-code` | Explicitly run the bullshit detector code audit |
-| `--no-audit-code` | Skip the default bullshit detector code audit |
+| `--audit-code` | Include the bullshit detector code audit in the main report |
 | `--diff` | With `cargo bless bs`, audit only changed lines from `git diff HEAD` |
 | `--verbose` | Show every code-audit finding instead of the top findings summary |
 | `--json` | Output suggestions as JSON array (for CI/pipelines) |
@@ -94,9 +93,9 @@ Or pass a custom path: `cargo bless --policy=custom-bless.toml`
 ## Example
 
 ```
-$ cargo bless
+$ cargo bless --audit-code
 
-🔥 cargo-bless v0.1.3
+🔥 cargo-bless v0.1.4
 
 📋 Scanning dependencies...
 
@@ -184,7 +183,7 @@ Before any write, `--fix` creates a `Cargo.toml.bak` backup and runs `cargo upda
 2. Rules from `data/suggestions.json` are matched against direct deps (single-crate and combo patterns)
 3. `crates_io_api::SyncClient` fetches live metadata (cached to `~/.cache/cargo-bless/` with 1-hour TTL)
 4. `reqwest` checks GitHub for `pushed_at`, `archived`, and star count
-5. The bullshit detector scans Rust files under `src`, `tests`, `examples`, and `benches` for static complexity patterns
+5. With `--audit-code` or `cargo bless bs`, the bullshit detector scans Rust files under `src`, `tests`, `examples`, and `benches` for static complexity patterns
 6. `toml_edit` applies fixes while preserving comments and formatting
 
 Network calls are non-fatal — if you're offline, the rule-based report still works.

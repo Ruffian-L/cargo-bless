@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 /// Cargo subcommand wrapper — invoked as `cargo bless`.
 #[derive(Parser, Debug)]
@@ -11,12 +11,27 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     /// Bless your dependencies — modernize, optimize, and stay current.
-    Bless(BlessOpts),
+    Bless(BlessCommand),
     /// Run only the bullshit detector code audit.
     Bs(CodeAuditOpts),
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(Args, Debug)]
+pub struct BlessCommand {
+    #[command(flatten)]
+    pub opts: BlessOpts,
+
+    #[command(subcommand)]
+    pub command: Option<BlessSubcommand>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum BlessSubcommand {
+    /// Run only the bullshit detector code audit.
+    Bs(CodeAuditOpts),
+}
+
+#[derive(Args, Debug)]
 pub struct BlessOpts {
     /// Apply suggested changes to Cargo.toml (creates .bak backup first).
     #[arg(long)]
@@ -43,7 +58,7 @@ pub struct BlessOpts {
     pub audit_code: bool,
 
     /// Skip the default bullshit detector code audit.
-    #[arg(long)]
+    #[arg(long, hide = true)]
     pub no_audit_code: bool,
 
     /// Output suggestions in JSON format.
@@ -80,7 +95,7 @@ pub struct BlessOpts {
     pub verbose: bool,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(Args, Debug)]
 pub struct CodeAuditOpts {
     /// Path to the Cargo.toml whose source tree should be audited.
     #[arg(long, value_name = "PATH")]
