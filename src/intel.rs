@@ -13,7 +13,11 @@ use anyhow::{Context, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
-const USER_AGENT: &str = "cargo-bless/0.1.0 (https://github.com/Ruffian-L/cargo-bless)";
+const USER_AGENT: &str = concat!(
+    "cargo-bless/",
+    env!("CARGO_PKG_VERSION"),
+    " (https://github.com/Ruffian-L/cargo-bless)"
+);
 const CACHE_TTL_SECS: u64 = 3600; // 1 hour
 
 // ── Public types ─────────────────────────────────────────────────────
