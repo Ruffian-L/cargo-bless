@@ -4,7 +4,8 @@ All notable changes to `cargo-bless` are logged here.
 
 ## 0.1.8 (2026-05-02)
 
-- **blessed.rs ingest:** Recalibrated migration cues against upstream [`data/crates.json`](https://raw.githubusercontent.com/nicoburns/blessed-rs/main/data/crates.json) and refreshed Firecrawl snapshots of [`blessed.rs`](https://blessed.rs/) + [`blessed.rs/crates`](https://blessed.rs/crates). Drops bogus rules driven only by “simpler” / overly broad “prefer” matches (notably flume ↔ crossbeam-channel ordering and color-eyre ↔ anyhow “otherwise simpler” tails). Keeps stronger signals: explicit **older**/deprecation cues, **go-to**/“now the …” modernization language, **games**/2d + simpler niche rows.
+- Published to [crates.io/cargo-bless/0.1.8](https://crates.io/crates/cargo-bless/0.1.8). GitHub: [PR #33](https://github.com/Ruffian-L/cargo-bless/pull/33).
+- Recalibrated blessed migration cues against upstream [`data/crates.json`](https://raw.githubusercontent.com/nicoburns/blessed-rs/main/data/crates.json) and Firecrawl snapshots of [`blessed.rs`](https://blessed.rs/) / [`blessed.rs/crates`](https://blessed.rs/crates). Filters out bogus rows driven only by “simpler” / loose “prefer” matches (e.g. flume vs crossbeam-channel, color-eyre vs anyhow tails). Keeps explicit **older**/deprecation wording, **go-to** / “now the …” modernization copy, and niche **games**/2d + simpler notes.
 - Converter **strips HTML** from blessed notes before classification; reasons use that cleaned text.
 
 ## 0.1.7 (2026-05-02)
