@@ -70,6 +70,39 @@ fn test_unfinished_flag_exits_nonzero() {
 }
 
 #[test]
+fn test_dry_run_without_fix_exits_nonzero() {
+    cargo_bless_cmd()
+        .arg("--dry-run")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--dry-run requires --fix"));
+}
+
+#[test]
+fn test_json_fix_combination_exits_nonzero() {
+    cargo_bless_cmd()
+        .arg("--json")
+        .arg("--fix")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "--json cannot be combined with --fix",
+        ));
+}
+
+#[test]
+fn test_json_update_rules_combination_exits_nonzero() {
+    cargo_bless_cmd()
+        .arg("--json")
+        .arg("--update-rules")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "--json cannot be combined with --update-rules",
+        ));
+}
+
+#[test]
 fn test_explicit_missing_policy_exits_nonzero() {
     cargo_bless_cmd()
         .arg("--policy")
@@ -237,7 +270,7 @@ serde_derive = { path = "crates/serde_derive" }
 }
 
 #[test]
-fn test_bless_reports_code_audit_by_default() {
+fn test_bless_skips_code_audit_by_default() {
     use std::fs;
     use tempfile::TempDir;
 
@@ -278,13 +311,61 @@ edition = "2021"
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(!stdout.contains("Bullshit detector code audit"));
+    assert!(!stdout.contains("unwrap abuse"));
+    assert!(!stdout.contains("sleep abuse"));
+}
+
+#[test]
+fn test_audit_code_flag_runs_code_audit() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "test-audit-code"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(
+        tmp.path().join("src/main.rs"),
+        r#"fn main() {
+    let value = std::env::var("NOPE").unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    println!("{}", value);
+}
+"#,
+    )
+    .expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--offline")
+        .arg("--audit-code");
+
+    let output = cmd.output().expect("run cargo-bless");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
     assert!(stdout.contains("Bullshit detector code audit"));
     assert!(stdout.contains("unwrap abuse"));
     assert!(stdout.contains("sleep abuse"));
 }
 
 #[test]
-fn test_no_audit_code_skips_code_audit() {
+fn test_no_audit_code_remains_accepted_as_noop() {
     let output = cargo_bless_cmd()
         .arg("--offline")
         .arg("--no-audit-code")
@@ -297,7 +378,7 @@ fn test_no_audit_code_skips_code_audit() {
 }
 
 #[test]
-fn test_bs_subcommand_runs_code_audit_only() {
+fn test_direct_bs_subcommand_runs_code_audit_only() {
     use std::fs;
     use tempfile::TempDir;
 
@@ -336,7 +417,49 @@ edition = "2021"
 }
 
 #[test]
-fn test_json_contains_dependency_and_code_sections() {
+fn test_cargo_style_bs_subcommand_runs_code_audit_only() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "test-cargo-style-bs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(
+        tmp.path().join("src/lib.rs"),
+        "pub fn bad() { thing().unwrap(); }\n",
+    )
+    .expect("write lib.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("bs")
+        .arg("--manifest-path")
+        .arg(&manifest);
+
+    let output = cmd.output().expect("run cargo-bless bless bs");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(stdout.contains("Bullshit detector code audit"));
+    assert!(stdout.contains("unwrap abuse"));
+    assert!(!stdout.contains("Direct dependencies"));
+}
+
+#[test]
+fn test_json_contains_dependency_section_and_null_code_audit_by_default() {
     use std::fs;
     use tempfile::TempDir;
 
@@ -369,6 +492,52 @@ lazy_static = "1"
         .arg(&manifest)
         .arg("--offline")
         .arg("--json");
+
+    let output = cmd.output().expect("run cargo-bless json");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(stdout.contains("\"dependency_suggestions\""));
+    assert!(stdout.contains("\"code_audit\": null"));
+    assert!(stdout.contains("lazy_static"));
+    assert!(!stdout.contains("UnwrapAbuse"));
+}
+
+#[test]
+fn test_json_with_audit_code_contains_code_audit_section() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "test-json-audit"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lazy_static = "1"
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(
+        tmp.path().join("src/main.rs"),
+        "fn main() { thing().unwrap(); }\n",
+    )
+    .expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--offline")
+        .arg("--json")
+        .arg("--audit-code");
 
     let output = cmd.output().expect("run cargo-bless json");
     let stdout = String::from_utf8_lossy(&output.stdout);
