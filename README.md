@@ -2,7 +2,22 @@
 
 A Cargo subcommand that checks your dependencies against [blessed.rs](https://blessed.rs/) recommendations and suggests modern alternatives.
 
+API reference: [cargo-bless on docs.rs](https://docs.rs/cargo-bless).
+
 `cargo-bless` checks whether your Rust dependency tree is modern, boring, and defensible.
+
+### Release framing (semver)
+
+| Version | What it represented |
+|---------|---------------------|
+| **0.1.0** | Birth |
+| **0.1.1–0.1.3** | Rapid hardening |
+| **0.1.4** | First “people might actually try this” slice — think *how does a stranger feel after running this once?* |
+
+**Likely near-term forks:**
+
+- **0.1.5** — “stranger trust” polish: clearer copy, `--feedback` pasteables, tighter `--fix` disclaimers.
+- **0.2.0** — Policy / config maturity: fuller `bless.toml` fields, failure gates, workspace coverage, offline-first behavior.
 
 ## What it does
 
@@ -42,6 +57,7 @@ cargo install --path .
 cargo bless                  # scan and report
 cargo bless bs               # run only the bullshit detector code audit
 cargo bless bs --diff        # audit only lines changed since HEAD
+cargo bless --feedback       # print a privacy-safe block for issue reports / Discord
 cargo bless --fix --dry-run  # preview changes without writing
 cargo bless --fix            # apply changes (creates .bak backup)
 cargo bless --update-rules   # fetch latest rules from blessed.rs
@@ -64,6 +80,26 @@ cargo bless --audit-code     # include code audit in the main report
 | `--policy=PATH` | Use custom bless.toml policy file |
 | `--update-rules` | Fetch latest rules from blessed.rs |
 | `--manifest-path=PATH` | Path to Cargo.toml (defaults to current directory) |
+| `--feedback` | Emit version, dep counts, suggestion counts, and top code-audit hotspots (paste into issues; no telemetry) |
+
+### Pasteable feedback (`--feedback`)
+
+Tried cargo-bless on a non-trivial tree? Paste the output of **`cargo bless --feedback`** into a GitHub issue. It prints aggregate counts plus coarsely-ranked source locations (`path::fn` where we can infer a function); it does **not** list crate names from your dependency graph or cargo-bless’s suggestion text — no telemetry runs.
+
+Example shape:
+
+```
+cargo-bless feedback block
+version: 0.1.5
+direct_deps: 46
+total_deps: 624
+suggestions: 2
+high_impact: 1
+code_audit_findings: 401
+top_hotspots:
+  - src/main.rs::run_simulation
+  - src/main.rs:apply_forces
+```
 
 ### Policy File (bless.toml)
 
@@ -95,7 +131,7 @@ Or pass a custom path: `cargo bless --policy=custom-bless.toml`
 ```
 $ cargo bless --audit-code
 
-🔥 cargo-bless v0.1.4
+🔥 cargo-bless v0.1.5
 
 📋 Scanning dependencies...
 

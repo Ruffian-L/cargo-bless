@@ -1,5 +1,6 @@
 pub mod bs_detector;
 pub mod code_audit;
+pub mod feedback;
 pub mod fix;
 pub mod intel;
 pub mod output;
