@@ -77,7 +77,7 @@ pub fn update_rules() -> Result<Vec<Rule>> {
 
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(15))
-        .user_agent("cargo-bless/0.1.0")
+        .user_agent(concat!("cargo-bless/", env!("CARGO_PKG_VERSION")))
         .build()
         .context("failed to build HTTP client")?;
 
