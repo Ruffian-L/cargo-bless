@@ -87,6 +87,20 @@ impl CodeAuditReport {
     }
 }
 
+/// Concatenate workspace member audits into one report (sums `files_scanned`, merges alerts).
+pub fn merge_reports(reports: Vec<CodeAuditReport>) -> CodeAuditReport {
+    let mut files_scanned = 0usize;
+    let mut alerts = Vec::new();
+    for r in reports {
+        files_scanned += r.files_scanned;
+        alerts.extend(r.alerts);
+    }
+    CodeAuditReport {
+        files_scanned,
+        alerts,
+    }
+}
+
 pub fn scan_project(
     manifest_path: Option<&Path>,
     config: &CodeAuditConfig,

@@ -19,6 +19,9 @@ pub struct Suggestion {
     pub migration_risk: MigrationRisk,
     pub autofix_safety: AutofixSafety,
     pub evidence_source: EvidenceSource,
+    /// Workspace member that triggered this suggestion (root-only runs use `None`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub package: Option<String>,
 }
 
 impl Suggestion {
@@ -45,7 +48,7 @@ pub enum SuggestionKind {
 }
 
 /// Impact level of a suggestion.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Impact {
     High,
     Medium,
@@ -176,6 +179,16 @@ pub fn analyze(
     deps: &[ResolvedDep],
     rules: &[Rule],
 ) -> Vec<Suggestion> {
+    analyze_for_package(manifest_path, deps, rules, None)
+}
+
+/// Like [`analyze`], but tags each suggestion with `package` for workspace output.
+pub fn analyze_for_package(
+    manifest_path: Option<&Path>,
+    deps: &[ResolvedDep],
+    rules: &[Rule],
+    package_label: Option<&str>,
+) -> Vec<Suggestion> {
     let direct_names: HashSet<&str> = deps
         .iter()
         .filter(|d| d.is_direct)
@@ -226,6 +239,7 @@ pub fn analyze(
                 migration_risk: rule.migration_risk.clone(),
                 autofix_safety: rule.autofix_safety.clone(),
                 evidence_source: rule.evidence_source.clone(),
+                package: package_label.map(String::from),
             });
         }
     }

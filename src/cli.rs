@@ -33,11 +33,11 @@ pub enum BlessSubcommand {
 
 #[derive(Args, Debug)]
 pub struct BlessOpts {
-    /// Apply suggested changes to Cargo.toml (creates .bak backup first).
+    /// Apply suggested changes to Cargo.toml only (`*.toml.bak` backup before write; never touches `.rs`).
     #[arg(long)]
     pub fix: bool,
 
-    /// Preview changes without writing anything (requires --fix).
+    /// With `--fix`, print the unified diff and planned actions without writing or running `cargo update`.
     #[arg(long)]
     pub dry_run: bool,
 
@@ -45,6 +45,9 @@ pub struct BlessOpts {
     #[arg(long)]
     pub feedback: bool,
 
+    /// Short paste-friendly dependency summary: counts, impacts, and deduped suggestion patterns (not JSON; omits live intel).
+    #[arg(long)]
+    pub summary: bool,
     /// Fetch the latest rules from blessed.rs and update the local cache.
     #[arg(long)]
     pub update_rules: bool,
@@ -69,19 +72,18 @@ pub struct BlessOpts {
     #[arg(long)]
     pub json: bool,
 
-    /// Exit with non-zero code when a suggestion matches the given severity level(s).
-    /// Reserved severity gate. Comma-separated: low, medium, high, critical.
-    #[arg(long, value_delimiter = ',', hide = true)]
+    /// Exit non-zero when any dependency suggestion matches one of these impacts (comma-separated: low, medium, high, critical).
+    /// `critical` is treated as **high** until a separate code-audit gate exists.
+    #[arg(long, value_delimiter = ',')]
     pub fail_on: Vec<String>,
 
-    /// Analyze all workspace members instead of only the root package.
-    #[arg(long, hide = true)]
+    /// Analyze every workspace member’s `Cargo.toml` (one `cargo metadata` call).
+    #[arg(long)]
     pub workspace: bool,
 
-    /// Only analyze the specified package(s) in a workspace. Accepts package names.
-    #[arg(long, value_delimiter = ',', hide = true)]
+    /// Only analyze these workspace member package names (comma-separated). Implies member selection; combine with `--workspace` to avoid ambiguity on some layouts.
+    #[arg(long, value_delimiter = ',')]
     pub package: Vec<String>,
-
     /// Include dev-dependencies and build-dependencies in analysis.
     #[arg(long, hide = true)]
     pub all_targets: bool,

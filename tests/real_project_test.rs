@@ -259,13 +259,18 @@ fn test_fail_on_high_exits_nonzero() {
         .expect("failed to execute cargo-bless");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
 
-    if stdout.contains("--fail-on") || output.status.code() == Some(0) {
-        eprintln!("Note: --fail-on may not be fully wired yet (Phase 2)");
-    } else {
-        assert!(
-            !output.status.success(),
-            "Should exit non-zero when high-impact suggestions found with --fail-on=high"
-        );
-    }
+    assert!(
+        !output.status.success(),
+        "Should exit non-zero when high-impact suggestions found with --fail-on=high. stdout={}, stderr={}",
+        stdout,
+        stderr,
+    );
+
+    assert!(
+        stderr.contains("matched --fail-on"),
+        "Expected fail-on message in stderr, got {}",
+        stderr
+    );
 }

@@ -34,7 +34,7 @@ fn test_fix_dry_run() {
         .arg("--dry-run")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Dry-run mode"));
+        .stdout(predicate::str::contains("Dry-run"));
 }
 
 /// Running with --help should print usage information.
@@ -48,25 +48,57 @@ fn test_help_flag() {
 }
 
 #[test]
-fn test_unfinished_flags_are_hidden_from_help() {
+fn test_planned_flags_remain_hidden_from_help() {
     cargo_bless_cmd()
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("--fail-on").not())
-        .stdout(predicate::str::contains("--workspace").not())
-        .stdout(predicate::str::contains("--package").not())
         .stdout(predicate::str::contains("--all-targets").not())
         .stdout(predicate::str::contains("--llm").not());
 }
 
 #[test]
-fn test_unfinished_flag_exits_nonzero() {
-    cargo_bless_cmd()
-        .arg("--fail-on=high")
-        .assert()
+fn test_fail_on_unknown_level_exits_nonzero() {
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless").arg("--fail-on=bogus");
+    cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("--fail-on is not implemented"));
+        .stderr(predicate::str::contains("unknown --fail-on level"));
+}
+
+#[test]
+fn test_fail_on_high_exits_nonzero_with_suggestions() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "fail-on-high"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lazy_static = "1"
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(tmp.path().join("src/main.rs"), "fn main() {}").expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--offline")
+        .arg("--fail-on=high");
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "exiting with non-zero status: at least one dependency suggestion matched --fail-on",
+    ));
 }
 
 #[test]
@@ -484,6 +516,102 @@ edition = "2021"
 }
 
 #[test]
+fn test_summary_prints_heading_and_counts() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "summary-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lazy_static = "1"
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(tmp.path().join("src/main.rs"), "fn main() {}\n").expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--offline")
+        .arg("--summary");
+
+    cmd.assert()
+        .success()
+        .stdout(predicate::str::contains("Summary"))
+        .stdout(predicate::str::contains("Suggestions after policy"));
+}
+
+#[test]
+fn test_workspace_flag_lists_members_and_lazy_static_hit() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+
+    fs::write(
+        tmp.path().join("Cargo.toml"),
+        r#"[workspace]
+members = ["crates/alpha", "crates/bravo"]
+resolver = "2"
+"#,
+    )
+    .expect("write workspace Cargo.toml");
+
+    for (rel, deps) in [
+        (
+            "crates/alpha",
+            r#"lazy_static = "1"
+
+"#,
+        ),
+        ("crates/bravo", ""),
+    ] {
+        let dir = tmp.path().join(rel);
+        fs::create_dir_all(dir.join("src")).expect("create pkg src");
+        fs::write(
+            dir.join("Cargo.toml"),
+            format!(
+                r#"[package]
+name = "{}"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+{deps}"#,
+                rel.trim_start_matches("crates/"),
+                deps = deps,
+            ),
+        )
+        .expect("write member Cargo.toml");
+        fs::write(dir.join("src/lib.rs"), "").expect("write lib.rs");
+    }
+
+    let root_manifest = tmp.path().join("Cargo.toml");
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("--manifest-path")
+        .arg(&root_manifest)
+        .arg("--workspace")
+        .arg("--offline");
+
+    cmd.assert().success().stdout(
+        predicate::str::contains("Workspace: 2 members")
+            .and(predicate::str::contains("lazy_static")),
+    );
+}
+
+#[test]
 fn test_json_contains_dependency_section_and_null_code_audit_by_default() {
     use std::fs;
     use tempfile::TempDir;
@@ -522,6 +650,9 @@ lazy_static = "1"
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(stdout.contains("\"cargo_bless_version\""));
+    assert!(stdout.contains("\"workspace_scan\""));
+    assert!(stdout.contains("\"packages\""));
     assert!(stdout.contains("\"dependency_suggestions\""));
     assert!(stdout.contains("\"code_audit\": null"));
     assert!(stdout.contains("lazy_static"));
@@ -568,6 +699,8 @@ lazy_static = "1"
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(stdout.contains("\"cargo_bless_version\""));
+    assert!(stdout.contains("\"packages\""));
     assert!(stdout.contains("\"dependency_suggestions\""));
     assert!(stdout.contains("\"code_audit\""));
     assert!(stdout.contains("lazy_static"));

@@ -2,6 +2,14 @@
 
 All notable changes to `cargo-bless` are logged here.
 
+## 0.2.0 (2026-05-02)
+
+- **`--workspace` / `--package`:** Scan every `workspace.members` crate (single `cargo metadata`); **`--package`** filters by **`[package].name`**; per-member suggestions + autofix loops each member **`Cargo.toml`**. Virtual workspace roots tolerate missing **`resolve.root`** when iterating members.
+- **`--summary`:** Concise dependency roll-up (**counts**, **impact tallies**, **deduped `crate → reco` bullets**); skips crates.io/GitHub intel. Compared with **`--feedback`** vs **`--json`** in `README.md` and `docs/cli-reference.md`.
+- **`--fail-on`:** Exit non-zero when any retained suggestion’s **impact** matches **`low`** / **`medium`** / **`high`** / **`critical`** (**critical aliases high** for dependency tier until code-audit gating arrives).
+- **JSON breaking layout:** **`cargo_bless_version`**, **`workspace_scan`**, **`packages[]`**, per-package **`dependency_suggestions`**, nullable **`code_audit`**; **`cargo bless bs --json`** uses **`packages: []`** + audit blob.
+- **Fix trust copy:** **`--dry-run`** / **`--fix`** Cargo.toml-only messaging across README + `main` banners + **`fix::apply`** stderr + modernization footer.
+
 ## 0.1.8 (2026-05-02)
 
 - Published to [crates.io/cargo-bless/0.1.8](https://crates.io/crates/cargo-bless/0.1.8). GitHub: [PR #33](https://github.com/Ruffian-L/cargo-bless/pull/33).

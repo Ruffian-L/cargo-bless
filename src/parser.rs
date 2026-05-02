@@ -1,8 +1,8 @@
 //! Parser layer — extracts the full dependency tree from Cargo.toml / Cargo.lock
 //! using `cargo_metadata` for feature-aware resolution.
 
-use anyhow::Result;
-use cargo_metadata::{CargoOpt, MetadataCommand, Node, Package, Resolve};
+use anyhow::{bail, Result};
+use cargo_metadata::{CargoOpt, MetadataCommand, Node, Package, PackageId, Resolve};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -19,6 +19,17 @@ pub struct ResolvedDep {
     pub source: Option<String>,
     pub repository: Option<String>,
     pub is_direct: bool,
+}
+
+/// One Cargo package in the workspace (or the resolved root crate) plus its dependency tree.
+///
+/// Produced before suggestion analysis runs; see Phase 3 workspace design (`docs/`).
+#[derive(Debug, Clone)]
+pub struct PackageResult {
+    pub name: String,
+    pub version: String,
+    pub manifest_path: PathBuf,
+    pub deps: Vec<ResolvedDep>,
 }
 
 impl fmt::Display for ResolvedDep {
@@ -74,11 +85,53 @@ fn build_pkg_lookup(metadata: &cargo_metadata::Metadata) -> HashMap<String, Pack
         .collect()
 }
 
-/// Parse the dependency tree for the project at `manifest_path`.
+/// Parse the dependency tree for the project at `manifest_path` (resolved root crate only).
 ///
 /// **Key change**: uses `resolve.nodes[].features` for the **actual enabled features**
 /// rather than `pkg.features.keys()` which only lists declared/available features.
 pub fn get_deps(manifest_path: Option<&Path>) -> Result<Vec<ResolvedDep>> {
+    let snapshots = fetch_metadata_and_snapshots(manifest_path, SnapshotMode::RootOnly)?;
+    snapshots
+        .into_iter()
+        .next()
+        .map(|p| p.deps)
+        .ok_or_else(|| anyhow::anyhow!("No dependency snapshot produced"))
+}
+
+/// Load dependency snapshots for workspace members according to Cargo metadata.
+///
+/// - **Root-only**: `workspace_all_members` false and `package_filters` empty — only `[package]` at the resolved root (`resolve.root`).
+/// - **All members**: `workspace_all_members` true — every entry in `metadata.workspace_members`.
+/// - **Filtered**: non-empty `package_filters` — members whose names match case-insensitively (comma-separated CLI values become one slice).
+///
+/// Caller should pass **`workspace_all_members = true`** to scan the whole workspace, or use filters alone for specific crates.
+pub fn get_package_snapshots(
+    manifest_path: Option<&Path>,
+    workspace_all_members: bool,
+    package_filters: &[String],
+) -> Result<Vec<PackageResult>> {
+    fetch_metadata_and_snapshots(
+        manifest_path,
+        SnapshotMode::Custom {
+            workspace_all_members,
+            filters: package_filters,
+        },
+    )
+}
+
+#[derive(Clone, Copy, Debug)]
+enum SnapshotMode<'a> {
+    RootOnly,
+    Custom {
+        workspace_all_members: bool,
+        filters: &'a [String],
+    },
+}
+
+fn fetch_metadata_and_snapshots(
+    manifest_path: Option<&Path>,
+    mode: SnapshotMode<'_>,
+) -> Result<Vec<PackageResult>> {
     let mut cmd = metadata_command(manifest_path);
     cmd.features(CargoOpt::AllFeatures);
 
@@ -88,48 +141,125 @@ pub fn get_deps(manifest_path: Option<&Path>) -> Result<Vec<ResolvedDep>> {
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("No dependency resolution found"))?;
 
-    // Build node lookup for resolved (enabled) features
     let node_map = build_node_lookup(resolve);
     let pkg_map = build_pkg_lookup(&metadata);
 
-    // Collect root/direct dependency names for tagging
-    let root_id = resolve
-        .root
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("No root package in resolve"))?;
+    let workspace_packages_ordered: Vec<&Package> = metadata
+        .workspace_members
+        .iter()
+        .filter_map(|id| metadata.packages.iter().find(|p| &p.id == id))
+        .collect();
 
-    // Find the root node to get its direct dependencies
+    let resolve_workspace_root_pkg = || -> Result<&Package> {
+        let root_id = resolve
+            .root
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No root package in resolve"))?;
+        pkg_map
+            .get(&root_id.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Root package not in cargo metadata packages list"))
+    };
+
+    let targets = match mode {
+        SnapshotMode::RootOnly => vec![resolve_workspace_root_pkg()?],
+        SnapshotMode::Custom {
+            workspace_all_members,
+            filters,
+        } => {
+            if workspace_all_members && filters.is_empty() {
+                workspace_packages_ordered
+            } else if !filters.is_empty() {
+                let wanted_set: HashSet<String> = filters
+                    .iter()
+                    .map(|s| s.trim().to_ascii_lowercase())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+
+                let mut matched: Vec<&Package> = workspace_packages_ordered
+                    .iter()
+                    .copied()
+                    .filter(|p| wanted_set.contains(&p.name.to_ascii_lowercase()))
+                    .collect();
+
+                matched.sort_by(|a, b| a.name.cmp(&b.name));
+
+                let mut missing = Vec::new();
+                for w in &wanted_set {
+                    if !matched
+                        .iter()
+                        .any(|p| p.name.eq_ignore_ascii_case(w.as_str()))
+                    {
+                        missing.push(w.clone());
+                    }
+                }
+
+                if !missing.is_empty() {
+                    bail!(
+                        "no workspace package(s) matching {:?} — available: {}",
+                        missing,
+                        workspace_packages_ordered
+                            .iter()
+                            .map(|p| p.name.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    );
+                }
+
+                matched
+            } else {
+                vec![resolve_workspace_root_pkg()?]
+            }
+        }
+    };
+
+    let mut out = Vec::with_capacity(targets.len());
+    for pkg in targets {
+        let deps = resolve_deps_for_root(&pkg.id, resolve, &pkg_map, &node_map)?;
+        out.push(PackageResult {
+            name: pkg.name.to_string(),
+            version: pkg.version.to_string(),
+            manifest_path: PathBuf::from(pkg.manifest_path.as_str()),
+            deps,
+        });
+    }
+
+    Ok(out)
+}
+
+/// Resolve flattened dependency list relative to `root_pkg_id`'s subtree.
+fn resolve_deps_for_root(
+    root_pkg_id: &PackageId,
+    resolve: &Resolve,
+    pkg_map: &HashMap<String, Package>,
+    node_map: &HashMap<String, Node>,
+) -> Result<Vec<ResolvedDep>> {
     let root_node = node_map
-        .get(&root_id.to_string())
-        .ok_or_else(|| anyhow::anyhow!("Root node not found in resolve nodes"))?;
+        .get(&root_pkg_id.to_string())
+        .ok_or_else(|| anyhow::anyhow!("Root node missing in resolve.nodes"))?;
 
-    // Direct dependency IDs are those listed as deps of the root node
     let direct_dep_ids: HashSet<String> =
         root_node.deps.iter().map(|d| d.pkg.to_string()).collect();
 
     let mut deps = Vec::new();
 
     for node in &resolve.nodes {
-        // Skip the root package itself
-        if node.id == *root_id {
+        if node.id == *root_pkg_id {
             continue;
         }
 
         let pkg = match pkg_map.get(&node.id.to_string()) {
             Some(p) => p,
-            None => continue, // not a real crate (e.g. virtual manifest)
+            None => continue,
         };
 
         let is_direct = direct_dep_ids.contains(&node.id.to_string());
 
-        // Enabled features come from the resolved node (what's actually turned on)
         let enabled_features: Vec<String> = node
             .features
             .iter()
             .map(|s| s.as_str().to_string())
             .collect();
 
-        // Available features come from the package manifest (what's declared)
         let available_features: Vec<String> = pkg.features.keys().map(|s| s.to_string()).collect();
 
         deps.push(ResolvedDep {
