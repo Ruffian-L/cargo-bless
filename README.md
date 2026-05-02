@@ -15,6 +15,7 @@ A Cargo subcommand that checks your dependencies against [blessed.rs](https://bl
 | **0.1.4** | First “people might actually try this” slice — think *how does a stranger feel after running this once?* |
 | **0.1.5** | Stranger-trust polish shipped: `cargo bless --feedback`, softer `chrono` ↔ `time` copy, root changelog |
 | **0.1.6** | Documentation pass: README links, `docs/` index (architecture, CLI, contributing) |
+| **0.1.7** | Rule merges fixed (embedded suggestions win over blessed cache/tooling); curated rules + selective blessed rows (`ggez`); CI smoke for `--feedback` |
 
 **Likely near-term forks:**
 
@@ -92,7 +93,7 @@ Example shape:
 
 ```
 cargo-bless feedback block
-version: 0.1.6
+version: 0.1.7
 direct_deps: 46
 total_deps: 624
 suggestions: 2
@@ -133,7 +134,7 @@ Or pass a custom path: `cargo bless --policy=custom-bless.toml`
 ```
 $ cargo bless --audit-code
 
-🔥 cargo-bless v0.1.6
+🔥 cargo-bless v0.1.7
 
 📋 Scanning dependencies...
 

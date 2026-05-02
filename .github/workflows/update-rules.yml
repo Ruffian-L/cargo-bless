@@ -1,5 +1,8 @@
 name: Update Rules
 
+# Fetches blessed.rs and runs `cargo run --bin update-suggestions`:
+# handcrafted patterns in data/suggestions.json take precedence.
+
 on:
   schedule:
     - cron: "0 6 * * 1" # Monday 6am UTC
