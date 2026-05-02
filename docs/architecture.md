@@ -7,7 +7,7 @@
 | Module | Role |
 |--------|------|
 | `parser` | `cargo_metadata` — resolved dependency tree, direct vs transitive, features |
-| `suggestions` | Embedded `data/suggestions.json` rules; match and build `Suggestion` values |
+| `suggestions` | Embedded `data/suggestions.json` rules; optionally augmented by fresh blessed-rs cache (**local patterns override cache** — same precedence as `update-suggestions`). Match deps and output `Suggestion` values |
 | `policy` | Optional `bless.toml` — ignore packages, limits, code-audit filters |
 | `intel` | Optional crates.io + GitHub metadata (cached under `~/.cache/cargo-bless/`); skipped when `--offline` or `[settings].offline` |
 | `feedback` | `--feedback` — aggregate counts + code-audit “hotspots” without listing crate names or hitting the network |

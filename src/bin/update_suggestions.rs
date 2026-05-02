@@ -25,24 +25,23 @@ fn main() -> Result<()> {
         Vec::new()
     };
 
-    // Merge: blessed.rs rules first, then append hand-crafted rules
-    // whose patterns are not already covered by blessed.rs
-    let blessed_patterns: HashSet<String> =
-        blessed_rules.iter().map(|r| r.pattern.clone()).collect();
+    // Merge: handcrafted rules stay authoritative; blessed.rs fills in only
+    // patterns we do not already define locally (avoid clobbering tuned copy).
+    let hand_patterns: HashSet<String> = existing.iter().map(|r| r.pattern.clone()).collect();
 
-    let mut merged = blessed_rules;
-    let mut kept = 0usize;
-    for rule in existing {
-        if !blessed_patterns.contains(&rule.pattern) {
+    let mut merged = existing;
+    let mut from_blessed = 0usize;
+    for rule in blessed_rules {
+        if !hand_patterns.contains(&rule.pattern) {
             merged.push(rule);
-            kept += 1;
+            from_blessed += 1;
         }
     }
 
     println!(
-        "Merged: {} from blessed.rs + {} hand-crafted = {} total",
-        merged.len() - kept,
-        kept,
+        "Merged: {} hand-authored + {} new from blessed.rs = {} total",
+        merged.len() - from_blessed,
+        from_blessed,
         merged.len()
     );
 

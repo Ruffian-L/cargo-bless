@@ -2,6 +2,12 @@
 
 All notable changes to `cargo-bless` are logged here.
 
+## 0.1.7 (2026-05-02)
+
+- **Rule merging (both tooling and runtime):** `data/suggestions.json` patterns are **authoritative**. `cargo run --bin update-suggestions` and `suggestions::load_rules()` append blessed-derived rows only when the pattern is absent locally — fixes curated rules being overwritten when the blessed converter is conservative or the cache briefly contains a worse row (e.g. `lazy_static` → `once_cell`).
+- **Rules data:** Merged one new blessed row (`ggez` → `bevy`); dropped `color-eyre` and `flume` suggestions that were misleading or self-contradictory from the live blessed fetch.
+- **CI / docs:** Smoke run for `cargo bless --feedback`; `update-rules` workflow comment clarifies merge policy; `docs/contributing.md` documents review after rule merges.
+
 ## 0.1.6 (2026-05-02)
 
 - Published to [crates.io/cargo-bless/0.1.6](https://crates.io/crates/cargo-bless/0.1.6). GitHub: [PR #28](https://github.com/Ruffian-L/cargo-bless/pull/28).
