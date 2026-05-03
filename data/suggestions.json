@@ -394,5 +394,113 @@
     "migration_risk": "Medium",
     "autofix_safety": "ManualOnly",
     "evidence_source": "BlessedRs"
+  },
+  {
+    "pattern": "serde_cbor",
+    "replacement": "ciborium",
+    "kind": "Unmaintained",
+    "reason": "serde_cbor is officially abandoned — its README says 'This project is no longer maintained. Please use ciborium instead.' ciborium is the maintained RustCrypto replacement with a compatible API.",
+    "source": "crates.io",
+    "condition": null,
+    "confidence": "High",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "CratesIo"
+  },
+  {
+    "pattern": "serde_yaml",
+    "replacement": "serde_yml",
+    "kind": "Unmaintained",
+    "reason": "serde_yaml was archived by its author (dtolnay) in 2024; serde_yml is the community-maintained fork with a compatible API and active releases.",
+    "source": "crates.io",
+    "condition": null,
+    "confidence": "High",
+    "migration_risk": "Low",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "CratesIo"
+  },
+  {
+    "pattern": "tempdir",
+    "replacement": "tempfile",
+    "kind": "Unmaintained",
+    "reason": "tempdir is deprecated — its crates.io page says 'Moved to tempfile::TempDir'. Last release was 2018; tempfile provides TempDir with the same API.",
+    "source": "crates.io",
+    "condition": null,
+    "confidence": "High",
+    "migration_risk": "Low",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "CratesIo"
+  },
+  {
+    "pattern": "atty",
+    "replacement": "std::io::IsTerminal",
+    "kind": "StdReplacement",
+    "reason": "std::io::IsTerminal was stabilized in Rust 1.70 and covers virtually all atty use cases; most crates have already migrated and atty is unmaintained.",
+    "source": "std docs",
+    "condition": null,
+    "confidence": "High",
+    "migration_risk": "Low",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "StdDocs"
+  },
+  {
+    "pattern": "docopt",
+    "replacement": "clap",
+    "kind": "Unmaintained",
+    "reason": "docopt is effectively unmaintained (no meaningful releases since 2021) and the Rust ecosystem has standardized on clap for CLI argument parsing.",
+    "source": "crates.io",
+    "condition": null,
+    "confidence": "Medium",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "CratesIo"
+  },
+  {
+    "pattern": "slog",
+    "replacement": "tracing",
+    "kind": "ModernAlternative",
+    "reason": "slog is an older structured logging framework; tracing is the modern ecosystem choice with async-aware spans, compatible subscribers, and wider crate adoption.",
+    "source": "blessed.rs",
+    "condition": null,
+    "confidence": "Medium",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
+  },
+  {
+    "pattern": "ansi_term",
+    "replacement": "owo-colors",
+    "kind": "Unmaintained",
+    "reason": "ansi_term was unmaintained for years; owo-colors is a zero-dependency, no-std-compatible alternative with an ergonomic API. nu-ansi-term is another maintained fork.",
+    "source": "crates.io",
+    "condition": null,
+    "confidence": "Medium",
+    "migration_risk": "Low",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "CratesIo"
+  },
+  {
+    "pattern": "term",
+    "replacement": "termcolor",
+    "kind": "Unmaintained",
+    "reason": "the term crate is old and rarely updated; termcolor is the BurntSushi-maintained replacement with cross-platform ANSI and Windows console support.",
+    "source": "crates.io",
+    "condition": null,
+    "confidence": "Medium",
+    "migration_risk": "Low",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "CratesIo"
+  },
+  {
+    "pattern": "futures-preview",
+    "replacement": "futures",
+    "kind": "Unmaintained",
+    "reason": "futures-preview was the pre-stabilization async crate — async/await has been stable since Rust 1.39; use the futures crate directly.",
+    "source": "crates.io",
+    "condition": null,
+    "confidence": "High",
+    "migration_risk": "Low",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "CratesIo"
   }
 ]
