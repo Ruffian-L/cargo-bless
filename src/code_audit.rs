@@ -87,6 +87,20 @@ impl CodeAuditReport {
     }
 }
 
+/// Concatenate workspace member audits into one report (sums `files_scanned`, merges alerts).
+pub fn merge_reports(reports: Vec<CodeAuditReport>) -> CodeAuditReport {
+    let mut files_scanned = 0usize;
+    let mut alerts = Vec::new();
+    for r in reports {
+        files_scanned += r.files_scanned;
+        alerts.extend(r.alerts);
+    }
+    CodeAuditReport {
+        files_scanned,
+        alerts,
+    }
+}
+
 pub fn scan_project(
     manifest_path: Option<&Path>,
     config: &CodeAuditConfig,
@@ -417,6 +431,13 @@ fn scan_regex_patterns(code: &str, file: &Path, alerts: &mut Vec<BullshitAlert>)
             0.78,
             "Sleep calls are often timing bullshit instead of synchronization.",
             "Replace sleeps with explicit readiness, timeouts, retries, or test clocks.",
+        ),
+        (
+            r"Arc\s*<\s*(String|Vec\s*<|Box\s*<)",
+            BullshitKind::ArcAbuse,
+            0.62,
+            "Arc<String>, Arc<Vec<...>>, or Arc<Box<...>> wraps a value type in shared ownership — often unnecessary.",
+            "Use Arc<str> instead of Arc<String>, or reconsider whether sharing is needed at all.",
         ),
     ];
 

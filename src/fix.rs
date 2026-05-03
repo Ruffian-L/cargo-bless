@@ -43,6 +43,11 @@ pub fn apply(suggestions: &[Suggestion], manifest_path: &Path, dry_run: bool) ->
         });
     }
 
+    eprintln!(
+        "{}",
+        "ℹ️  Autofix: edits Cargo.toml dependency lines only — never Rust source.".dimmed()
+    );
+
     let original = fs::read_to_string(manifest_path)
         .with_context(|| format!("failed to read {}", manifest_path.display()))?;
 
@@ -430,6 +435,7 @@ mod tests {
                 _ => AutofixSafety::CargoTomlOnly,
             },
             evidence_source: EvidenceSource::Heuristic,
+            package: None,
         }
     }
 
