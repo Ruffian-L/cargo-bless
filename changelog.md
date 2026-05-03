@@ -2,6 +2,19 @@
 
 All notable changes to `cargo-bless` are logged here.
 
+## 0.2.4 (2026-05-02)
+
+- **Rules database: +9 new hand-authored rules** (42 total, up from 33):
+  - `serde_cbor` → `ciborium` (High — officially abandoned, README says so)
+  - `serde_yaml` → `serde_yml` (High — archived by dtolnay 2024; community fork)
+  - `tempdir` → `tempfile` (High — deprecated, crates.io says "Moved to tempfile::TempDir")
+  - `atty` → `std::io::IsTerminal` (High — std replacement stable since Rust 1.70)
+  - `futures-preview` → `futures` (High — pre-stabilization crate, async stable since 1.39)
+  - `docopt` → `clap` (Medium — effectively unmaintained since 2021)
+  - `slog` → `tracing` (Medium — older structured logging; tracing is the modern go-to)
+  - `ansi_term` → `owo-colors` (Medium — unmaintained for years; zero-dep replacement)
+  - `term` → `termcolor` (Medium — old crate; BurntSushi's termcolor is the maintained choice)
+
 ## 0.2.3 (2026-05-02)
 
 - **`cargo bless --init-ci`:** Writes a ready-to-commit `.github/workflows/bless.yml` that gates PRs on `--fail-on high` and uploads SARIF findings to GitHub code scanning. Exits non-zero if the file already exists.
