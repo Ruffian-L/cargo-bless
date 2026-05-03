@@ -397,6 +397,8 @@ pub struct JsonReportUnified<'a> {
     pub workspace_scan: bool,
     pub packages: Vec<JsonPackageOutput<'a>>,
     pub code_audit: Option<&'a CodeAuditReport>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hardcoded_values: Option<&'a [crate::bs_detector::BSHit]>,
 }
 
 pub fn render_unified_json(report: JsonReportUnified<'_>) {

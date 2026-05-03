@@ -26,7 +26,12 @@ fn use_tagged_suggestions(opts: &cli::BlessOpts) -> bool {
 
 fn load_snapshots(opts: &cli::BlessOpts) -> Result<Vec<cargo_bless::parser::PackageResult>> {
     let manifest = opts.manifest_path.as_deref();
-    cargo_bless::parser::get_package_snapshots(manifest, opts.workspace, &opts.package)
+    cargo_bless::parser::get_package_snapshots(
+        manifest,
+        opts.workspace,
+        &opts.package,
+        opts.all_targets,
+    )
 }
 
 fn parse_fail_on_levels(
@@ -159,6 +164,7 @@ fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
             workspace_scan: opts.workspace || snapshots.len() > 1,
             packages: packages_for_json,
             code_audit: merged_audit.as_ref(),
+            hardcoded_values: None,
         };
         cargo_bless::output::render_unified_json(report);
         maybe_fail_on_exit(&all_suggestions, &fail_levels)?;
@@ -449,17 +455,32 @@ fn run_code_audit_command(opts: cli::CodeAuditOpts) -> Result<()> {
         cargo_bless::code_audit::scan_project(manifest, &code_audit_config)?
     };
 
+    let bs_hits = if opts.hardcoded {
+        let root = manifest
+            .and_then(Path::parent)
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        cargo_bless::bs_detector::scan_dir(root)
+    } else {
+        Vec::new()
+    };
+
     if opts.json {
         let unified = cargo_bless::output::JsonReportUnified {
             cargo_bless_version: env!("CARGO_PKG_VERSION"),
             workspace_scan: false,
             packages: Vec::new(),
             code_audit: Some(&report),
+            hardcoded_values: if opts.hardcoded { Some(&bs_hits) } else { None },
         };
         cargo_bless::output::render_unified_json(unified);
     } else {
         println!("🔥 cargo-bless v{}", env!("CARGO_PKG_VERSION"));
         cargo_bless::output::render_code_audit_report(&report, opts.verbose);
+        if opts.hardcoded {
+            println!();
+            cargo_bless::bs_detector::render_bs_hits(&bs_hits);
+        }
     }
 
     Ok(())
@@ -557,9 +578,6 @@ fn reject_invalid_flag_combinations(opts: &cli::BlessOpts) -> Result<()> {
 fn reject_unfinished_flags(opts: &cli::BlessOpts) -> Result<()> {
     if opts.llm {
         bail!("--llm is not implemented in cargo-bless yet");
-    }
-    if opts.all_targets {
-        bail!("--all-targets is not implemented in cargo-bless yet");
     }
 
     Ok(())

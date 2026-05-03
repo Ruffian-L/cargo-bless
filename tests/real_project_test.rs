@@ -104,11 +104,12 @@ fn test_ripgrep_finds_serde_derive_suggestion() {
         }
     };
 
-    let output = run_bless(&project_dir, &["--offline"]);
+    // serde_derive is a dev-dep in ripgrep — requires --all-targets to surface
+    let output = run_bless(&project_dir, &["--offline", "--all-targets"]);
 
     assert!(
         output.contains("serde_derive"),
-        "Should flag serde_derive as legacy split in ripgrep.\nOutput:\n{}",
+        "Should flag serde_derive as legacy split in ripgrep (dev-dep, requires --all-targets).\nOutput:\n{}",
         output
     );
 }
@@ -151,18 +152,41 @@ fn test_old_project_finds_all_outdated_deps() {
 
     let output = run_bless(&project_dir, &["--offline"]);
 
-    // Should find all these outdated deps
+    // Should find all these outdated normal deps
     assert!(output.contains("lazy_static"), "Should flag lazy_static");
-    assert!(output.contains("once_cell"), "Should flag once_cell");
     assert!(output.contains("structopt"), "Should flag structopt");
     assert!(output.contains("memmap"), "Should flag memmap");
     assert!(output.contains("log"), "Should flag log");
     assert!(output.contains("env_logger"), "Should flag env_logger");
 
+    // once_cell is a dev-dep — only flagged with --all-targets
+    assert!(
+        !output.contains("once_cell"),
+        "once_cell is a dev-dep and should not appear without --all-targets"
+    );
+
     // Should NOT flag modern deps
     assert!(
         !output.contains("serde →") || output.contains("serde_derive"),
         "Should not suggest replacing serde itself"
+    );
+}
+
+#[test]
+fn test_all_targets_includes_dev_deps() {
+    let project_dir = old_project_dir();
+
+    if !project_dir.exists() {
+        eprintln!("Skipping: old-rust-project fixture not found");
+        return;
+    }
+
+    let output = run_bless(&project_dir, &["--offline", "--all-targets"]);
+
+    // once_cell is in [dev-dependencies] — should appear with --all-targets
+    assert!(
+        output.contains("once_cell"),
+        "once_cell dev-dep should be flagged with --all-targets"
     );
 }
 

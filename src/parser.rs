@@ -2,7 +2,7 @@
 //! using `cargo_metadata` for feature-aware resolution.
 
 use anyhow::{bail, Result};
-use cargo_metadata::{CargoOpt, MetadataCommand, Node, Package, PackageId, Resolve};
+use cargo_metadata::{CargoOpt, DependencyKind, MetadataCommand, Node, Package, PackageId, Resolve};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -90,7 +90,8 @@ fn build_pkg_lookup(metadata: &cargo_metadata::Metadata) -> HashMap<String, Pack
 /// **Key change**: uses `resolve.nodes[].features` for the **actual enabled features**
 /// rather than `pkg.features.keys()` which only lists declared/available features.
 pub fn get_deps(manifest_path: Option<&Path>) -> Result<Vec<ResolvedDep>> {
-    let snapshots = fetch_metadata_and_snapshots(manifest_path, SnapshotMode::RootOnly)?;
+    let snapshots =
+        fetch_metadata_and_snapshots(manifest_path, SnapshotMode::RootOnly, false)?;
     snapshots
         .into_iter()
         .next()
@@ -104,11 +105,13 @@ pub fn get_deps(manifest_path: Option<&Path>) -> Result<Vec<ResolvedDep>> {
 /// - **All members**: `workspace_all_members` true — every entry in `metadata.workspace_members`.
 /// - **Filtered**: non-empty `package_filters` — members whose names match case-insensitively (comma-separated CLI values become one slice).
 ///
-/// Caller should pass **`workspace_all_members = true`** to scan the whole workspace, or use filters alone for specific crates.
+/// `all_targets` widens what counts as a "direct" dep to include `[dev-dependencies]` and
+/// `[build-dependencies]` in addition to normal `[dependencies]`.
 pub fn get_package_snapshots(
     manifest_path: Option<&Path>,
     workspace_all_members: bool,
     package_filters: &[String],
+    all_targets: bool,
 ) -> Result<Vec<PackageResult>> {
     fetch_metadata_and_snapshots(
         manifest_path,
@@ -116,6 +119,7 @@ pub fn get_package_snapshots(
             workspace_all_members,
             filters: package_filters,
         },
+        all_targets,
     )
 }
 
@@ -131,6 +135,7 @@ enum SnapshotMode<'a> {
 fn fetch_metadata_and_snapshots(
     manifest_path: Option<&Path>,
     mode: SnapshotMode<'_>,
+    all_targets: bool,
 ) -> Result<Vec<PackageResult>> {
     let mut cmd = metadata_command(manifest_path);
     cmd.features(CargoOpt::AllFeatures);
@@ -214,7 +219,7 @@ fn fetch_metadata_and_snapshots(
 
     let mut out = Vec::with_capacity(targets.len());
     for pkg in targets {
-        let deps = resolve_deps_for_root(&pkg.id, resolve, &pkg_map, &node_map)?;
+        let deps = resolve_deps_for_root(&pkg.id, resolve, &pkg_map, &node_map, all_targets)?;
         out.push(PackageResult {
             name: pkg.name.to_string(),
             version: pkg.version.to_string(),
@@ -227,18 +232,31 @@ fn fetch_metadata_and_snapshots(
 }
 
 /// Resolve flattened dependency list relative to `root_pkg_id`'s subtree.
+///
+/// When `all_targets` is false (the default), only `[dependencies]` entries are treated as
+/// direct. When true, `[dev-dependencies]` and `[build-dependencies]` are also considered direct.
 fn resolve_deps_for_root(
     root_pkg_id: &PackageId,
     resolve: &Resolve,
     pkg_map: &HashMap<String, Package>,
     node_map: &HashMap<String, Node>,
+    all_targets: bool,
 ) -> Result<Vec<ResolvedDep>> {
     let root_node = node_map
         .get(&root_pkg_id.to_string())
         .ok_or_else(|| anyhow::anyhow!("Root node missing in resolve.nodes"))?;
 
-    let direct_dep_ids: HashSet<String> =
-        root_node.deps.iter().map(|d| d.pkg.to_string()).collect();
+    let direct_dep_ids: HashSet<String> = root_node
+        .deps
+        .iter()
+        .filter(|d| {
+            all_targets
+                || d.dep_kinds
+                    .iter()
+                    .any(|k| k.kind == DependencyKind::Normal)
+        })
+        .map(|d| d.pkg.to_string())
+        .collect();
 
     let mut deps = Vec::new();
 

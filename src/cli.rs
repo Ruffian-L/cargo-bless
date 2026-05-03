@@ -85,7 +85,7 @@ pub struct BlessOpts {
     #[arg(long, value_delimiter = ',')]
     pub package: Vec<String>,
     /// Include dev-dependencies and build-dependencies in analysis.
-    #[arg(long, hide = true)]
+    #[arg(long)]
     pub all_targets: bool,
 
     /// Do not fetch online data; use only the local rule cache.
@@ -122,4 +122,8 @@ pub struct CodeAuditOpts {
     /// Show every finding instead of a concise summary.
     #[arg(long)]
     pub verbose: bool,
+
+    /// Also scan for hardcoded values: magic numbers, API keys, IPs, URLs, credentials.
+    #[arg(long)]
+    pub hardcoded: bool,
 }

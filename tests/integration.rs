@@ -53,7 +53,7 @@ fn test_planned_flags_remain_hidden_from_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("--all-targets").not())
+        .stdout(predicate::str::contains("--all-targets"))
         .stdout(predicate::str::contains("--llm").not());
 }
 
@@ -866,4 +866,170 @@ edition = "2021"
 
     assert!(output.status.success(), "should exit 0: {}", stdout);
     assert!(stdout.contains("unwrap abuse"));
+}
+
+#[test]
+fn test_package_flag_filters_workspace_member() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+
+    fs::write(
+        tmp.path().join("Cargo.toml"),
+        r#"[workspace]
+members = ["alpha", "bravo"]
+resolver = "2"
+"#,
+    )
+    .expect("write root Cargo.toml");
+
+    // alpha has lazy_static (should trigger a suggestion)
+    let alpha = tmp.path().join("alpha");
+    fs::create_dir_all(alpha.join("src")).expect("create alpha/src");
+    fs::write(
+        alpha.join("Cargo.toml"),
+        r#"[package]
+name = "alpha"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lazy_static = "1"
+"#,
+    )
+    .expect("write alpha Cargo.toml");
+    fs::write(alpha.join("src/lib.rs"), "").expect("write alpha lib.rs");
+
+    // bravo has no outdated deps
+    let bravo = tmp.path().join("bravo");
+    fs::create_dir_all(bravo.join("src")).expect("create bravo/src");
+    fs::write(
+        bravo.join("Cargo.toml"),
+        r#"[package]
+name = "bravo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write bravo Cargo.toml");
+    fs::write(bravo.join("src/lib.rs"), "").expect("write bravo lib.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("--manifest-path")
+        .arg(tmp.path().join("Cargo.toml"))
+        .arg("--package=alpha")
+        .arg("--offline");
+
+    let output = cmd.output().expect("run cargo-bless --package alpha");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(
+        stdout.contains("lazy_static"),
+        "alpha's lazy_static should appear: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_explicit_policy_flag_suppresses_suggestion() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+    let policy_path = tmp.path().join("bless.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "policy-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lazy_static = "1"
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(tmp.path().join("src/main.rs"), "fn main() {}").expect("write main.rs");
+
+    fs::write(
+        &policy_path,
+        r#"ignore_packages = ["lazy_static"]
+"#,
+    )
+    .expect("write bless.toml");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--policy")
+        .arg(&policy_path)
+        .arg("--offline");
+
+    let output = cmd.output().expect("run cargo-bless --policy");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        output.status.success(),
+        "should exit 0 even when suggestions exist: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("already blessed"),
+        "policy should suppress the lazy_static suggestion: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_bs_hardcoded_flag_reports_hardcoded_values() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "hardcoded-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(
+        tmp.path().join("src/main.rs"),
+        "fn main() { let ip = \"192.168.1.100\"; let _ = ip; }\n",
+    )
+    .expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bs")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--hardcoded");
+
+    let output = cmd.output().expect("run cargo-bless bs --hardcoded");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(
+        stdout.contains("192.168.1.100"),
+        "hardcoded IP should be detected: {}",
+        stdout
+    );
 }

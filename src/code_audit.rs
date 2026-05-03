@@ -432,6 +432,13 @@ fn scan_regex_patterns(code: &str, file: &Path, alerts: &mut Vec<BullshitAlert>)
             "Sleep calls are often timing bullshit instead of synchronization.",
             "Replace sleeps with explicit readiness, timeouts, retries, or test clocks.",
         ),
+        (
+            r"Arc\s*<\s*(String|Vec\s*<|Box\s*<)",
+            BullshitKind::ArcAbuse,
+            0.62,
+            "Arc<String>, Arc<Vec<...>>, or Arc<Box<...>> wraps a value type in shared ownership — often unnecessary.",
+            "Use Arc<str> instead of Arc<String>, or reconsider whether sharing is needed at all.",
+        ),
     ];
 
     for (pattern, kind, confidence, why, suggestion) in patterns {
