@@ -24,6 +24,8 @@ pub enum BullshitKind {
     DynTraitAbuse,
     CloneAbuse,
     MutexAbuse,
+    TodoUnimplemented,
+    RefCellAbuse,
 }
 
 impl BullshitKind {
@@ -39,6 +41,8 @@ impl BullshitKind {
             Self::DynTraitAbuse => "dyn trait abuse",
             Self::CloneAbuse => "clone abuse",
             Self::MutexAbuse => "mutex abuse",
+            Self::TodoUnimplemented => "todo/unimplemented",
+            Self::RefCellAbuse => "RefCell abuse",
         }
     }
 }
@@ -441,6 +445,20 @@ fn scan_regex_patterns(code: &str, file: &Path, alerts: &mut Vec<BullshitAlert>)
             0.62,
             "Arc<String>, Arc<Vec<...>>, or Arc<Box<...>> wraps a value type in shared ownership — often unnecessary.",
             "Use Arc<str> instead of Arc<String>, or reconsider whether sharing is needed at all.",
+        ),
+        (
+            r"\b(todo|unimplemented)\s*!\s*\(",
+            BullshitKind::TodoUnimplemented,
+            0.75,
+            "todo!() or unimplemented!() will panic at runtime if reached in production.",
+            "Return a Result or Option instead; replace the placeholder with a real implementation or a meaningful error.",
+        ),
+        (
+            r"RefCell\s*<",
+            BullshitKind::RefCellAbuse,
+            0.60,
+            "RefCell<T> defers borrow checking to runtime — a panic will occur if borrow rules are violated.",
+            "Consider restructuring to use compile-time borrows, or Cell<T> for Copy types.",
         ),
     ];
 

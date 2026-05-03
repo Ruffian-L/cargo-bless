@@ -502,5 +502,17 @@
     "migration_risk": "Low",
     "autofix_safety": "ManualOnly",
     "evidence_source": "CratesIo"
+  },
+  {
+    "pattern": "async-trait",
+    "replacement": "native async fn in traits (Rust 1.75+)",
+    "kind": "StdReplacement",
+    "reason": "async fn in traits is stable since Rust 1.75 — async-trait is no longer needed for non-dyn trait usage. Note: if you use 'dyn Trait' with async methods, async-trait may still be required.",
+    "source": "Rust RFC 3185",
+    "condition": "non-dyn trait usage",
+    "confidence": "Medium",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "StdDocs"
   }
 ]

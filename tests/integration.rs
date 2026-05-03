@@ -1273,6 +1273,10 @@ edition = "2021"
         contents.contains("--fail-on high"),
         "workflow should include --fail-on high"
     );
+    assert!(
+        contents.contains("rust-cache"),
+        "workflow should include Rust dependency caching"
+    );
 
     // Second run — should fail because file already exists
     let mut cmd2 = Command::cargo_bin("cargo-bless").expect("binary should exist");
