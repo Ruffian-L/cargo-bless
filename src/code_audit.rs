@@ -74,6 +74,8 @@ pub struct CodeAuditConfig {
     pub max_file_bytes: u64,
     pub ignore_paths: Vec<String>,
     pub ignore_kinds: HashSet<String>,
+    /// Scan tests/, examples/, and benches/ in addition to src/. Default: false.
+    pub include_tests: bool,
 }
 
 impl Default for CodeAuditConfig {
@@ -83,6 +85,7 @@ impl Default for CodeAuditConfig {
             max_file_bytes: MAX_FILE_BYTES,
             ignore_paths: Vec::new(),
             ignore_kinds: HashSet::new(),
+            include_tests: false,
         }
     }
 }
@@ -140,8 +143,17 @@ fn scan_project_with_filter(
         .unwrap_or_else(|| Path::new("."));
 
     let mut files = Vec::new();
-    for dir in ["src", "tests", "examples", "benches"] {
-        collect_rust_files(&base_dir.join(dir), config, &mut files)?;
+    let src_dir = base_dir.join("src");
+    if src_dir.is_dir() {
+        collect_rust_files(&src_dir, config, &mut files)?;
+        if config.include_tests {
+            for dir in &["tests", "examples", "benches"] {
+                collect_rust_files(&base_dir.join(dir), config, &mut files)?;
+            }
+        }
+    } else {
+        // Non-standard layout: scan the manifest dir itself for .rs files
+        collect_rust_files(base_dir, config, &mut files)?;
     }
 
     let mut alerts = Vec::new();
@@ -203,6 +215,9 @@ pub fn config_from_policy(policy: Option<&crate::policy::Policy>) -> CodeAuditCo
         config.ignore_kinds = policy.code_audit.ignore_kinds.iter().cloned().collect();
         if policy.settings.min_confidence > 0.0 {
             config.confidence_threshold = policy.settings.min_confidence as f32;
+        }
+        if policy.code_audit.include_tests {
+            config.include_tests = true;
         }
     }
     config
@@ -373,27 +388,70 @@ fn parse_ignored_ranges(code: &str) -> Result<Vec<(usize, usize)>> {
         .ok_or_else(|| anyhow::anyhow!("tree-sitter failed to parse Rust source"))?;
 
     let mut ranges = Vec::new();
-    collect_ignored_ranges(tree.root_node(), &mut ranges);
+    collect_ignored_ranges(tree.root_node(), code.as_bytes(), &mut ranges);
     Ok(ranges)
 }
 
-fn collect_ignored_ranges(node: Node<'_>, ranges: &mut Vec<(usize, usize)>) {
-    if is_ignored_node(node.kind()) {
+fn collect_ignored_ranges(node: Node<'_>, code: &[u8], ranges: &mut Vec<(usize, usize)>) {
+    let kind = node.kind();
+
+    // Mask string/comment literals
+    if matches!(
+        kind,
+        "line_comment" | "block_comment" | "string_literal" | "raw_string_literal" | "char_literal"
+    ) {
         ranges.push((node.start_byte(), node.end_byte()));
+        return;
+    }
+
+    // At container levels, scan for attribute+item pairs where the attribute is #[test]
+    // or #[cfg(test)]. The attribute is a SIBLING of the item, not a child.
+    if matches!(kind, "source_file" | "declaration_list") {
+        let children: Vec<Node<'_>> = {
+            let mut cursor = node.walk();
+            node.children(&mut cursor).collect()
+        };
+        let mut i = 0;
+        while i < children.len() {
+            let child = children[i];
+            if child.kind() == "attribute_item" && is_test_attr(child, code) {
+                // Mask this attribute and the item that follows it (skip over any other
+                // attribute_item siblings until we hit the actual item)
+                ranges.push((child.start_byte(), child.end_byte()));
+                let mut j = i + 1;
+                while j < children.len() {
+                    let next = children[j];
+                    if next.kind() == "attribute_item" {
+                        ranges.push((next.start_byte(), next.end_byte()));
+                    } else {
+                        // This is the actual item (function, mod, etc.) — mask it
+                        ranges.push((next.start_byte(), next.end_byte()));
+                        i = j;
+                        break;
+                    }
+                    j += 1;
+                }
+            } else {
+                collect_ignored_ranges(child, code, ranges);
+            }
+            i += 1;
+        }
         return;
     }
 
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        collect_ignored_ranges(child, ranges);
+        collect_ignored_ranges(child, code, ranges);
     }
 }
 
-fn is_ignored_node(kind: &str) -> bool {
-    matches!(
-        kind,
-        "line_comment" | "block_comment" | "string_literal" | "raw_string_literal" | "char_literal"
-    )
+fn is_test_attr(node: Node<'_>, code: &[u8]) -> bool {
+    if let Ok(text) = std::str::from_utf8(&code[node.start_byte()..node.end_byte()]) {
+        let t: String = text.chars().filter(|c| !c.is_whitespace()).collect();
+        t == "#[test]" || t.contains("#[cfg(test)]") || t.contains("#[cfg(any(test")
+    } else {
+        false
+    }
 }
 
 fn mask_ranges(code: &str, ranges: &[(usize, usize)]) -> String {

@@ -505,7 +505,10 @@ fn run_feedback_command(opts: cli::BlessOpts) -> Result<()> {
 fn run_code_audit_command(opts: cli::CodeAuditOpts) -> Result<()> {
     let manifest = opts.manifest_path.as_deref();
     let policy = load_policy(opts.policy.as_deref(), manifest)?;
-    let code_audit_config = cargo_bless::code_audit::config_from_policy(policy.as_ref());
+    let mut code_audit_config = cargo_bless::code_audit::config_from_policy(policy.as_ref());
+    if opts.include_tests {
+        code_audit_config.include_tests = true;
+    }
     let report = if opts.diff {
         cargo_bless::code_audit::scan_git_diff(manifest, &code_audit_config)?
     } else {

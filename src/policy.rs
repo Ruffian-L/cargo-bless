@@ -100,6 +100,10 @@ pub struct CodeAuditPolicy {
     /// Suppress findings with these kind names, e.g. "UnwrapAbuse".
     #[serde(default)]
     pub ignore_kinds: Vec<String>,
+
+    /// Also scan tests/, examples/, and benches/ (default: false — src/ only).
+    #[serde(default)]
+    pub include_tests: bool,
 }
 
 /// Load policy from a bless.toml file at the given path.
