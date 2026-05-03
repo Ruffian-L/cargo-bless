@@ -2,6 +2,15 @@
 
 All notable changes to `cargo-bless` are logged here.
 
+## 0.2.6 (2026-05-03)
+
+- **`cargo bless --explain PATTERN`:** Show full details for any suggestion rule — kind, confidence, migration risk, reason, source. Fuzzy-matches on pattern name. Exits non-zero if no rule is found.
+- **`cargo bless --init-hooks`:** Writes `.git/hooks/pre-commit` (executable) that runs `cargo bless bs --fail-on-confidence 0.8` before each commit. Finds git root automatically via `git rev-parse`.
+- **`cargo bless bs --fix`:** Auto-replaces `.unwrap()` with `.expect("TODO: handle this")` across all flagged files, writing `*.rs.bak` backups. Only applies to `UnwrapAbuse` findings (safe mechanical transform).
+- **Better `UnwrapAbuse` suggestion:** Now explicitly mentions `.expect("reason")` as the quick practical fix.
+- **New rules:** `chan` → `crossbeam-channel` (High, unmaintained since 2017); `log4rs` → `tracing + tracing-subscriber` (Medium, modern observability stack). 45 rules total.
+- **Integration tests:** Added `test_explain_flag_shows_rule_details`, `test_explain_flag_unknown_pattern_exits_nonzero`, `test_bs_fix_replaces_unwrap_with_expect`.
+
 ## 0.2.5 (2026-05-02)
 
 - **New rule: `async-trait`** → native async fn in traits (Rust 1.75+). Medium confidence; notes the `dyn Trait` exception. 43 rules total.

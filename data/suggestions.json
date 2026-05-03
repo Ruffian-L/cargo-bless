@@ -514,5 +514,29 @@
     "migration_risk": "Medium",
     "autofix_safety": "ManualOnly",
     "evidence_source": "StdDocs"
+  },
+  {
+    "pattern": "chan",
+    "replacement": "crossbeam-channel",
+    "kind": "Unmaintained",
+    "reason": "chan has had no releases since 2017 and is effectively abandoned; crossbeam-channel is the maintained, high-performance drop-in with a compatible API.",
+    "source": "crates.io",
+    "condition": null,
+    "confidence": "High",
+    "migration_risk": "Low",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "CratesIo"
+  },
+  {
+    "pattern": "log4rs",
+    "replacement": "tracing + tracing-subscriber",
+    "kind": "ModernAlternative",
+    "reason": "log4rs is a log-based framework; tracing plus tracing-subscriber is the modern structured observability stack with async-aware spans and wider ecosystem support.",
+    "source": "blessed.rs",
+    "condition": null,
+    "confidence": "Medium",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   }
 ]
