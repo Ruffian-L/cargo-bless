@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::Parser;
 use colored::*;
 
@@ -85,6 +85,9 @@ fn maybe_fail_on_exit(
 }
 
 fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
+    if opts.init_ci {
+        return run_init_ci(opts.manifest_path.as_deref());
+    }
     reject_invalid_flag_combinations(&opts)?;
     reject_unfinished_flags(&opts)?;
     if opts.feedback {
@@ -177,7 +180,7 @@ fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
         return Ok(());
     }
 
-    println!("🔥 cargo-bless v{}", env!("CARGO_PKG_VERSION"));
+    println!("🙏 cargo-bless v{}", env!("CARGO_PKG_VERSION"));
     println!();
 
     if opts.update_rules {
@@ -423,7 +426,7 @@ fn run_summary_mode(
         })
         .collect();
 
-    println!("🔥 cargo-bless v{}", env!("CARGO_PKG_VERSION"));
+    println!("🙏 cargo-bless v{}", env!("CARGO_PKG_VERSION"));
     println!();
     cargo_bless::output::render_summary(&scan_stats, &all);
     println!();
@@ -490,11 +493,26 @@ fn run_code_audit_command(opts: cli::CodeAuditOpts) -> Result<()> {
         };
         cargo_bless::output::render_unified_json(unified);
     } else {
-        println!("🔥 cargo-bless v{}", env!("CARGO_PKG_VERSION"));
+        println!("🙏 cargo-bless v{}", env!("CARGO_PKG_VERSION"));
         cargo_bless::output::render_code_audit_report(&report, opts.verbose);
         if opts.hardcoded {
             println!();
             cargo_bless::bs_detector::render_bs_hits(&bs_hits);
+        }
+    }
+
+    if let Some(threshold) = opts.fail_on_confidence {
+        let gated_count = report
+            .alerts
+            .iter()
+            .filter(|a| a.confidence as f64 >= threshold)
+            .count();
+        if gated_count > 0 {
+            eprintln!(
+                "cargo-bless: {} finding(s) at confidence >= {:.2}; exiting with non-zero status.",
+                gated_count, threshold
+            );
+            std::process::exit(1);
         }
     }
 
@@ -524,6 +542,72 @@ fn default_policy_path(manifest_path: Option<&Path>) -> PathBuf {
         .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."))
         .join("bless.toml")
+}
+
+const INIT_CI_WORKFLOW: &str = r#"name: cargo-bless
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  bless:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write  # required for upload-sarif
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-bless
+        run: cargo install cargo-bless --locked
+
+      - name: Dependency modernization check
+        run: cargo bless --fail-on high --offline
+
+      - name: Code audit (SARIF)
+        run: cargo bless bs --sarif > bless-audit.sarif
+        continue-on-error: true
+
+      - name: Upload SARIF to GitHub code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: bless-audit.sarif
+"#;
+
+fn run_init_ci(manifest_path: Option<&Path>) -> Result<()> {
+    let base = manifest_path
+        .and_then(Path::parent)
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+
+    let workflow_dir = base.join(".github").join("workflows");
+    let workflow_path = workflow_dir.join("bless.yml");
+
+    if workflow_path.exists() {
+        bail!(
+            "{} already exists — delete it first to regenerate.",
+            workflow_path.display()
+        );
+    }
+
+    std::fs::create_dir_all(&workflow_dir)
+        .with_context(|| format!("failed to create {}", workflow_dir.display()))?;
+    std::fs::write(&workflow_path, INIT_CI_WORKFLOW)
+        .with_context(|| format!("failed to write {}", workflow_path.display()))?;
+
+    println!("🙏 Created {}", workflow_path.display());
+    println!("   Commit and push to enable cargo-bless CI.");
+    println!();
+    println!("   The workflow:");
+    println!("     • Gates merges when any dep suggestion has --fail-on high impact");
+    println!("     • Uploads code-audit findings as SARIF (GitHub code scanning / PR annotations)");
+    println!();
+    println!("   Tip: add fail_on = [\"high\"] to bless.toml to enforce the gate without repeating the flag.");
+
+    Ok(())
 }
 
 fn apply_policy(

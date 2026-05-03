@@ -1131,3 +1131,165 @@ edition = "2021"
         "driver name must be cargo-bless"
     );
 }
+
+#[test]
+fn test_bs_min_confidence_in_policy_suppresses_low_confidence_findings() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "min-conf-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    // unwrap() triggers UnwrapAbuse at ~0.80 confidence; setting threshold to 0.99 should suppress it
+    fs::write(
+        tmp.path().join("src/main.rs"),
+        "fn main() { let x: Option<u32> = None; let _ = x.unwrap(); }\n",
+    )
+    .expect("write main.rs");
+
+    let policy_path = tmp.path().join("bless.toml");
+    fs::write(&policy_path, "[settings]\nmin_confidence = 0.99\n").expect("write bless.toml");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bs")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--policy")
+        .arg(&policy_path);
+
+    let output = cmd.output().expect("run cargo-bless bs with min_confidence policy");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(
+        !stdout.contains("UnwrapAbuse") && !stdout.contains("unwrap"),
+        "high threshold should suppress unwrap findings: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_bs_fail_on_confidence_exits_nonzero_when_findings_present() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "fail-conf-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(
+        tmp.path().join("src/main.rs"),
+        "fn main() { let x: Option<u32> = None; let _ = x.unwrap(); }\n",
+    )
+    .expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bs")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--fail-on-confidence")
+        .arg("0.5");
+
+    let output = cmd.output().expect("run cargo-bless bs --fail-on-confidence");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        !output.status.success(),
+        "should exit non-zero when findings meet confidence threshold"
+    );
+    assert!(
+        stderr.contains("exiting with non-zero status"),
+        "stderr should mention exit reason: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_init_ci_creates_workflow_file() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "init-ci-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    // First run — should create the file
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--init-ci");
+
+    let output = cmd.output().expect("run cargo bless --init-ci");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "first run should exit 0: {}", stdout);
+
+    let workflow_path = tmp.path().join(".github").join("workflows").join("bless.yml");
+    assert!(workflow_path.exists(), ".github/workflows/bless.yml should be created");
+
+    let contents = fs::read_to_string(&workflow_path).expect("read workflow file");
+    assert!(
+        contents.contains("upload-sarif"),
+        "workflow should include SARIF upload step"
+    );
+    assert!(
+        contents.contains("--fail-on high"),
+        "workflow should include --fail-on high"
+    );
+
+    // Second run — should fail because file already exists
+    let mut cmd2 = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd2.arg("bless")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--init-ci");
+
+    let output2 = cmd2.output().expect("run cargo bless --init-ci again");
+    assert!(
+        !output2.status.success(),
+        "second run should exit non-zero (file already exists)"
+    );
+    let stderr2 = String::from_utf8_lossy(&output2.stderr);
+    assert!(
+        stderr2.contains("already exists"),
+        "error should mention file already exists: {}",
+        stderr2
+    );
+}
