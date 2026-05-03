@@ -158,4 +158,8 @@ pub struct CodeAuditOpts {
     /// With `--fix`, show what would be changed without writing files or backups.
     #[arg(long)]
     pub dry_run: bool,
+
+    /// Also scan tests/, examples/, and benches/ (default: src/ only).
+    #[arg(long)]
+    pub include_tests: bool,
 }

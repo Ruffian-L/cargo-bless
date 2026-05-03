@@ -4,7 +4,7 @@ A Cargo subcommand that checks your dependencies against [blessed.rs](https://bl
 
 <div align="center">
 
-![cargo-bless — bless your dependency tree](https://raw.githubusercontent.com/Ruffian-L/cargo-bless/main/docs/images/readme-banner.png)
+![cargo-bless — bless your dependency tree](https://raw.githubusercontent.com/Ruffian-L/cargo-bless/main/docs/images/readme-banner.svg)
 
 [![Crates.io](https://img.shields.io/crates/v/cargo-bless.svg?style=for-the-badge)](https://crates.io/crates/cargo-bless)
 [![docs.rs](https://img.shields.io/docsrs/cargo-bless?style=for-the-badge)](https://docs.rs/cargo-bless)
@@ -30,13 +30,13 @@ A Cargo subcommand that checks your dependencies against [blessed.rs](https://bl
 ```mermaid
 flowchart LR
   A["Cargo.toml + lock"] --> B["cargo metadata\nresolved features"]
-  B --> C["Built-in rules\n(blessed.rs lineage)"]
+  B --> C["Built-in rules\n50 patterns"]
   C --> D["Suggestions\n+ trust metadata"]
   D --> E["TTY report or JSON"]
   E --> F{{"Extras"}}
-  F --> G["Live intel\ncrates.io / GitHub"]
+  F --> G["Live intel\ncrates.io / GitHub\nosv.dev advisories"]
   F --> H["--fix\nCargo.toml only"]
-  F --> I["--audit-code\nstatic scan"]
+  F --> I["--audit-code\nsrc/ static scan"]
 ```
 
 ### Which command should I run?
@@ -59,22 +59,22 @@ flowchart TD
 | **0.1.0** | Birth |
 | **0.1.1–0.1.3** | Rapid hardening |
 | **0.1.4** | First “people might actually try this” slice — think *how does a stranger feel after running this once?* |
-| **0.1.7** | Rule merges fixed (embedded suggestions win over blessed cache/tooling); selective blessed cherry-picks; CI `--feedback` smoke |
-| **0.1.8** | Blessed.rs ingest: tightened migration cues, HTML-stripped notes, regression tests aligned with upstream `crates.json` wording |
-| **0.2.0** | **`--workspace` / `--package`**, **`--summary`**, **`--fail-on`**, JSON grouped **per package**, virtual-workspace-safe metadata parsing, clearer **`--fix`** messaging (Cargo.toml-only) |
-
-**Likely near-term forks:**
-
-- **0.2.x** — `bless.toml` / severity gates refinement, `--all-targets`, cache-first polish.
+| **0.1.7–0.1.8** | Rule merges, blessed.rs ingest, HTML-stripped notes |
+| **0.2.0** | `--workspace`, `--summary`, `--fail-on`, JSON per-package, virtual-workspace-safe |
+| **0.2.1–0.2.3** | `--all-targets`, `bs --sarif`, `bs --fail-on-confidence`, `--init-ci`, policy gates |
+| **0.2.4–0.2.6** | +17 rules (50 total), `--explain`, `--init-hooks`, `bs --fix`, `bs --diff` |
+| **0.2.7** | New detectors (BoolComparison, StringAntiPattern, DiscardedError, LossyUtf8), 5 more rules, `bs --fix --dry-run` |
+| **0.3.0** | Security advisories via osv.dev, advisory data in JSON output, `--no-advisories` |
+| **0.3.1** | False-positive elimination: `#[test]` / `#[cfg(test)]` blocks masked via tree-sitter; default scan scope narrowed to `src/` (use `--include-tests` to opt in); non-`src/` crate layouts now scanned correctly |
 
 ## What it does
 
 - Scans your `Cargo.toml` dependency tree (direct + transitive, with features)
-- Matches against a built-in rule database sourced from blessed.rs
-- Detects single-crate replacements _and_ combo optimizations (e.g. dropping `serde_json` when `reqwest` has the `json` feature)
-- Optionally runs a built-in bullshit detector code audit for suspicious Rust complexity patterns
-- Fetches live metadata from crates.io (latest version, downloads) and GitHub (last push, archived status)
-- Optionally applies safe fixes to your `Cargo.toml` with `--fix` (preview first with `--dry-run`)
+- Matches against 50 built-in rules sourced from blessed.rs — single-crate and combo patterns
+- Fetches live metadata from crates.io (latest version, downloads), GitHub (last push, archived status), and [osv.dev](https://osv.dev/) (security advisories)
+- Runs a bullshit detector code audit: `UnwrapAbuse`, `FakeComplexity`, `TodoUnimplemented`, `RefCellAbuse`, `ArcAbuse`, `BoolComparison`, `StringAntiPattern`, `DiscardedError`, `LossyUtf8`, and more
+- Applies safe fixes to your `Cargo.toml` with `--fix` (preview first with `--dry-run`); auto-replaces `.unwrap()` → `.expect("TODO")` with `cargo bless bs --fix`
+- Generates CI workflows (`--init-ci`) and pre-commit hooks (`--init-hooks`)
 
 ## What cargo-bless is not
 
@@ -113,20 +113,27 @@ If the report looks sane, drop `--offline` to light up crates.io / GitHub intel 
 ## Usage
 
 ```sh
-cargo bless                  # scan and report (root package)
-cargo bless --workspace       # every workspace member (virtual workspace manifests OK)
-cargo bless --package=foo,bar # only listed member packages (comma-separated)
-cargo bless bs               # run only the bullshit detector code audit
-cargo bless bs --diff        # audit only lines changed since HEAD
-cargo bless --feedback       # paste-safe issue block (counts + code-audit hotspots; root crate only)
-cargo bless --summary        # paste-friendly dependency roll-up (counts + patterns; no live intel fetch)
-cargo bless --fail-on=high   # exit non-zero if any suggestion matches listed impact(s)
-cargo bless --fix --dry-run  # preview Cargo.toml diff only (no writes)
-cargo bless --fix            # apply Cargo.toml autofixes (`*.toml.bak`; never touches `.rs`)
-cargo bless --update-rules   # fetch latest rules from blessed.rs
-cargo bless --json           # structured JSON (`packages`, optional `code_audit`)
-cargo bless --offline        # skip crates.io/GitHub intel; rules + cache still apply
-cargo bless --audit-code     # include code audit in the main dependency run
+cargo bless                        # scan and report (root package)
+cargo bless --workspace            # every workspace member (virtual workspace manifests OK)
+cargo bless --package=foo,bar      # only listed member packages (comma-separated)
+cargo bless bs                     # run only the bullshit detector code audit
+cargo bless bs --diff              # audit only lines changed since HEAD
+cargo bless bs --fix               # auto-replace .unwrap() → .expect("TODO") (writes *.rs.bak backups)
+cargo bless bs --fix --dry-run     # preview what bs --fix would change (no writes)
+cargo bless bs --include-tests     # also scan tests/, examples/, benches/ (default: src/ only)
+cargo bless --feedback             # paste-safe issue block (counts + code-audit hotspots; root crate only)
+cargo bless --summary              # paste-friendly dependency roll-up (counts + patterns; no live intel fetch)
+cargo bless --fail-on=high         # exit non-zero if any suggestion matches listed impact(s)
+cargo bless --fix --dry-run        # preview Cargo.toml diff only (no writes)
+cargo bless --fix                  # apply Cargo.toml autofixes (`*.toml.bak`; never touches `.rs`)
+cargo bless --update-rules         # fetch latest rules from blessed.rs
+cargo bless --json                 # structured JSON (`packages`, optional `code_audit`, `security_advisories`)
+cargo bless --offline              # skip crates.io/GitHub/osv.dev intel; rules + cache still apply
+cargo bless --no-advisories        # skip osv.dev advisory check even when online
+cargo bless --audit-code           # include code audit in the main dependency run
+cargo bless --explain lazy_static  # show full details for a rule (kind, confidence, risk, reason)
+cargo bless --init-ci              # write .github/workflows/bless.yml and exit
+cargo bless --init-hooks           # write .git/hooks/pre-commit and exit
 ```
 
 ### Multi-crate workspaces
@@ -146,7 +153,7 @@ flowchart TB
 ```text
 $ cargo bless --workspace --offline
 
-🙏 cargo-bless v0.2.0
+🙏 cargo-bless v0.3.1
 
 📋 Scanning dependencies…
 
@@ -168,15 +175,17 @@ Workspace: 2 members · 17 direct deps (sum) · 344 resolved rows (sum).
 
 ### CLI Flags
 
+#### `cargo bless` flags
+
 | Flag | Description |
 |------|-------------|
 | `--fix` | Apply **Cargo.toml-only** autofixes (`*.toml.bak` on write); never edits Rust sources |
 | `--dry-run` | With `--fix`, prints the unified diff/plan — no files written, no `cargo update` |
 | `--audit-code` | Bullshit detector pass merged across selected packages (sums files + alerts) |
-| `--diff` | With `cargo bless bs`, audit only changed lines from `git diff HEAD` |
 | `--verbose` | Show every code-audit finding instead of the trimmed summary |
-| `--json` | Machine JSON (`cargo_bless_version`, `workspace_scan`, `packages[]`, `code_audit`) |
-| `--offline` | Skip crates.io/GitHub intel; rules + embedded data still apply |
+| `--json` | Machine JSON (`cargo_bless_version`, `workspace_scan`, `packages[]`, `code_audit`, `security_advisories`) |
+| `--offline` | Skip crates.io/GitHub/osv.dev intel; rules + embedded data still apply |
+| `--no-advisories` | Skip the osv.dev advisory check even when online |
 | `--policy=PATH` | Use custom `bless.toml` policy file |
 | `--update-rules` | Fetch latest blessed-derived rules into the cache |
 | `--manifest-path=PATH` | Workspace or package `Cargo.toml` (defaults to current directory) |
@@ -185,6 +194,26 @@ Workspace: 2 members · 17 direct deps (sum) · 344 resolved rows (sum).
 | `--fail-on=l,m,h,c` | Fail CI when any suggestion’s **impact** matches (comma-separated; `critical` aliases **high** for deps today) |
 | `--workspace` | Analyze all `[workspace].members` with one `cargo metadata` call |
 | `--package=NAMES` | Member filter (comma-separated names) |
+| `--all-targets` | Include `[dev-dependencies]` and `[build-dependencies]` in analysis |
+| `--explain=PATTERN` | Show full details for a rule — kind, confidence, migration risk, reason, source |
+| `--init-ci` | Write a starter `.github/workflows/bless.yml` and exit |
+| `--init-hooks` | Write `.git/hooks/pre-commit` (runs `cargo bless bs --fail-on-confidence 0.8`) and exit |
+
+#### `cargo bless bs` flags
+
+| Flag | Description |
+|------|-------------|
+| `--fix` | Auto-replace `.unwrap()` → `.expect("TODO: handle this")` (writes `*.rs.bak` backups) |
+| `--dry-run` | With `--fix`, preview what would change without writing files |
+| `--diff` | Audit only changed lines from `git diff HEAD` |
+| `--include-tests` | Also scan `tests/`, `examples/`, `benches/` (default: `src/` only) |
+| `--hardcoded` | Also scan for magic numbers, API keys, IPs, URLs, credentials |
+| `--sarif` | Output findings as SARIF 2.1.0 JSON (for GitHub code scanning / PR annotations) |
+| `--fail-on-confidence=FLOAT` | Exit non-zero if any finding has confidence ≥ this value (0.0–1.0) |
+| `--verbose` | Show every finding instead of the concise summary |
+| `--json` | Machine JSON output |
+| `--manifest-path=PATH` | Path to the `Cargo.toml` whose source tree should be audited |
+| `--policy=PATH` | Use custom `bless.toml` for code-audit suppressions |
 
 ### Picking an output mode
 
@@ -205,7 +234,7 @@ Example shape:
 
 ```
 cargo-bless feedback block
-version: 0.2.0
+version: 0.3.1
 direct_deps: 46
 total_deps: 624
 suggestions: 2
@@ -248,7 +277,7 @@ Synthetic screenshots below are trimmed for readability; your tree will differ.
 ### `cargo bless --summary` (paste-friendly roll-up)
 
 ```
-🙏 cargo-bless v0.2.0
+🙏 cargo-bless v0.3.1
 
 📊 Summary — scanned 1 workspace member
    • my-crate — 42 direct deps, 580 total in resolve
@@ -269,7 +298,7 @@ Top patterns:
 ```
 $ cargo bless --audit-code
 
-🙏 cargo-bless v0.2.0
+🙏 cargo-bless v0.3.1
 
 📋 Scanning dependencies...
 
@@ -321,7 +350,7 @@ Changes that would be applied:
 
 ```json
 {
-  "cargo_bless_version": "0.2.0",
+  "cargo_bless_version": "0.3.1",
   "workspace_scan": false,
   "packages": [
     {
@@ -409,13 +438,13 @@ Rules are embedded at compile time from `data/suggestions.json`. PRs to add more
 
 ## How --fix works
 
-Only suggestions marked `autofix_safety = "CargoTomlOnly"` are auto-fixable.
+Only suggestions marked `autofix_safety = "CargoTomlOnly"` are auto-fixable by `cargo bless --fix`.
 
-`StdReplacement`, `Unmaintained`, `ModernAlternative`, and `ComboWin` are reported but not auto-fixed by default, since they usually require source code changes or architectural judgment.
+`StdReplacement`, `Unmaintained`, `ModernAlternative`, and `ComboWin` are reported but not auto-fixed by default — they usually require source code changes or architectural judgment.
 
-Code-audit findings are advisory in this release. `--fix` only edits dependency declarations in `Cargo.toml`; it never rewrites Rust source files.
+Before any write, `--fix` creates a `Cargo.toml.bak` backup and runs `cargo update` afterward. Use `--dry-run` to preview the diff without touching files.
 
-Before any write, `--fix` creates a `Cargo.toml.bak` backup and runs `cargo update` afterward.
+`cargo bless bs --fix` is a separate, source-level auto-fixer: it replaces every `.unwrap()` call with `.expect("TODO: handle this")` across all flagged files (writes `*.rs.bak` backups). Use `--dry-run` to preview. Only `UnwrapAbuse` findings are touched — the transform is mechanical and safe.
 
 ## How it works
 
@@ -423,8 +452,9 @@ Before any write, `--fix` creates a `Cargo.toml.bak` backup and runs `cargo upda
 2. Rules from `data/suggestions.json` are matched against direct deps (single-crate and combo patterns)
 3. `crates_io_api::SyncClient` fetches live metadata (cached to `~/.cache/cargo-bless/` with 1-hour TTL)
 4. `reqwest` checks GitHub for `pushed_at`, `archived`, and star count
-5. With `--audit-code` or `cargo bless bs`, the bullshit detector scans Rust files under `src`, `tests`, `examples`, and `benches` for static complexity patterns
-6. `toml_edit` applies fixes while preserving comments and formatting
+5. Security advisories are fetched in a single batch call to [osv.dev](https://osv.dev/) for all direct deps (skipped with `--offline` or `--no-advisories`; non-fatal)
+6. With `--audit-code` or `cargo bless bs`, the bullshit detector scans Rust files under `src/` by default (opt in to `tests/`, `examples/`, `benches/` with `--include-tests`); `#[test]` and `#[cfg(test)]` blocks are masked via tree-sitter so test code never pollutes the report
+7. `toml_edit` applies fixes while preserving comments and formatting
 
 Network calls are non-fatal — if you're offline, the rule-based report still works.
 
