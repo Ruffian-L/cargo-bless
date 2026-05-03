@@ -508,7 +508,7 @@ fn run_code_audit_command(opts: cli::CodeAuditOpts) -> Result<()> {
     }
 
     if opts.fix {
-        apply_code_audit_fixes(&report)?;
+        apply_code_audit_fixes(&report, opts.dry_run)?;
     }
 
     if let Some(threshold) = opts.fail_on_confidence {
@@ -732,7 +732,10 @@ fn textwrap_rule(s: &str) -> Vec<String> {
     lines
 }
 
-fn apply_code_audit_fixes(report: &cargo_bless::code_audit::CodeAuditReport) -> Result<()> {
+fn apply_code_audit_fixes(
+    report: &cargo_bless::code_audit::CodeAuditReport,
+    dry_run: bool,
+) -> Result<()> {
     use std::collections::BTreeSet;
 
     let files_to_fix: BTreeSet<&std::path::PathBuf> = report
@@ -757,23 +760,41 @@ fn apply_code_audit_fixes(report: &cargo_bless::code_audit::CodeAuditReport) -> 
             continue;
         }
 
-        let backup = file.with_extension("rs.bak");
-        std::fs::write(&backup, &contents)
-            .with_context(|| format!("failed to write backup {}", backup.display()))?;
+        if dry_run {
+            println!(
+                "   {} {} .unwrap() → .expect(\"TODO: handle this\") in {}",
+                "would replace".dimmed(),
+                count,
+                file.display()
+            );
+        } else {
+            let backup = file.with_extension("rs.bak");
+            std::fs::write(&backup, &contents)
+                .with_context(|| format!("failed to write backup {}", backup.display()))?;
 
-        let modified = contents.replace(".unwrap()", ".expect(\"TODO: handle this\")");
-        std::fs::write(file, &modified)
-            .with_context(|| format!("failed to write {}", file.display()))?;
+            let modified = contents.replace(".unwrap()", ".expect(\"TODO: handle this\")");
+            std::fs::write(file, &modified)
+                .with_context(|| format!("failed to write {}", file.display()))?;
+        }
 
         total_replacements += count;
     }
 
-    println!(
-        "🙏 Fixed {} .unwrap() call(s) across {} file(s). Backups written as *.rs.bak.",
-        total_replacements,
-        files_to_fix.len()
-    );
-    println!("   Review each .expect() and replace the TODO with a real reason.");
+    if dry_run {
+        println!(
+            "🔍 Dry-run: {} .unwrap() call(s) across {} file(s) would be replaced (no files written).",
+            total_replacements,
+            files_to_fix.len()
+        );
+        println!("   Remove --dry-run to apply the fixes.");
+    } else {
+        println!(
+            "🙏 Fixed {} .unwrap() call(s) across {} file(s). Backups written as *.rs.bak.",
+            total_replacements,
+            files_to_fix.len()
+        );
+        println!("   Review each .expect() and replace the TODO with a real reason.");
+    }
 
     Ok(())
 }

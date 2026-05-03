@@ -150,4 +150,8 @@ pub struct CodeAuditOpts {
     /// Auto-fix safe findings: replaces .unwrap() with .expect("TODO") (writes *.rs.bak backups).
     #[arg(long)]
     pub fix: bool,
+
+    /// With `--fix`, show what would be changed without writing files or backups.
+    #[arg(long)]
+    pub dry_run: bool,
 }

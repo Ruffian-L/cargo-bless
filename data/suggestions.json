@@ -538,5 +538,65 @@
     "migration_risk": "Medium",
     "autofix_safety": "ManualOnly",
     "evidence_source": "BlessedRs"
+  },
+  {
+    "pattern": "simple_logger",
+    "replacement": "tracing + tracing-subscriber",
+    "kind": "ModernAlternative",
+    "reason": "simple_logger is a minimal log facade; tracing + tracing-subscriber is the modern Rust observability stack with structured fields, async-aware spans, and a richer subscriber ecosystem.",
+    "source": "blessed.rs",
+    "condition": null,
+    "confidence": "Medium",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
+  },
+  {
+    "pattern": "openssl",
+    "replacement": "rustls",
+    "kind": "ModernAlternative",
+    "reason": "openssl requires a native C library (libssl) and is a frequent source of CVEs; rustls is a pure-Rust TLS stack with no native dependencies and a strong security track record.",
+    "source": "blessed.rs",
+    "condition": null,
+    "confidence": "Medium",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
+  },
+  {
+    "pattern": "termion",
+    "replacement": "crossterm",
+    "kind": "ModernAlternative",
+    "reason": "termion is Unix-only and not actively maintained; crossterm is a cross-platform terminal manipulation library that works on Unix and Windows and is actively maintained.",
+    "source": "blessed.rs",
+    "condition": null,
+    "confidence": "High",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
+  },
+  {
+    "pattern": "getopts",
+    "replacement": "clap",
+    "kind": "Unmaintained",
+    "reason": "getopts is an old C-style argument parser that has had no meaningful updates in years; clap v4 with the derive feature provides ergonomic, type-safe CLI argument parsing with rich help generation.",
+    "source": "crates.io",
+    "condition": null,
+    "confidence": "High",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "CratesIo"
+  },
+  {
+    "pattern": "fern",
+    "replacement": "tracing + tracing-subscriber",
+    "kind": "ModernAlternative",
+    "reason": "fern is a runtime-configurable log framework; tracing + tracing-subscriber is the modern ecosystem choice with async-aware spans, structured events, and broad crate compatibility.",
+    "source": "blessed.rs",
+    "condition": null,
+    "confidence": "Medium",
+    "migration_risk": "Medium",
+    "autofix_safety": "ManualOnly",
+    "evidence_source": "BlessedRs"
   }
 ]
