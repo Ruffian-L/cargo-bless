@@ -88,6 +88,12 @@ fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
     if opts.init_ci {
         return run_init_ci(opts.manifest_path.as_deref());
     }
+    if opts.init_hooks {
+        return run_init_hooks(opts.manifest_path.as_deref());
+    }
+    if let Some(ref pattern) = opts.explain {
+        return run_explain(pattern);
+    }
     reject_invalid_flag_combinations(&opts)?;
     reject_unfinished_flags(&opts)?;
     if opts.feedback {
@@ -501,6 +507,10 @@ fn run_code_audit_command(opts: cli::CodeAuditOpts) -> Result<()> {
         }
     }
 
+    if opts.fix {
+        apply_code_audit_fixes(&report)?;
+    }
+
     if let Some(threshold) = opts.fail_on_confidence {
         let gated_count = report
             .alerts
@@ -612,6 +622,158 @@ fn run_init_ci(manifest_path: Option<&Path>) -> Result<()> {
     println!("     • Uploads code-audit findings as SARIF (GitHub code scanning / PR annotations)");
     println!();
     println!("   Tip: add fail_on = [\"high\"] to bless.toml to enforce the gate without repeating the flag.");
+
+    Ok(())
+}
+
+fn run_init_hooks(manifest_path: Option<&Path>) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let base = manifest_path
+        .and_then(Path::parent)
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+
+    let git_root_output = std::process::Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .current_dir(base)
+        .output()
+        .context("failed to run git rev-parse (is this a git repository?)")?;
+
+    if !git_root_output.status.success() {
+        bail!("not inside a git repository — cannot install a pre-commit hook");
+    }
+
+    let git_root = Path::new(std::str::from_utf8(&git_root_output.stdout)?.trim());
+    let hooks_dir = git_root.join(".git").join("hooks");
+    let hook_path = hooks_dir.join("pre-commit");
+
+    if hook_path.exists() {
+        bail!(
+            "{} already exists — delete it first to regenerate.",
+            hook_path.display()
+        );
+    }
+
+    std::fs::create_dir_all(&hooks_dir)
+        .with_context(|| format!("failed to create {}", hooks_dir.display()))?;
+
+    let hook_script = "#!/bin/sh\ncargo bless bs --fail-on-confidence 0.8\n";
+    std::fs::write(&hook_path, hook_script)
+        .with_context(|| format!("failed to write {}", hook_path.display()))?;
+    std::fs::set_permissions(&hook_path, std::fs::Permissions::from_mode(0o755))
+        .with_context(|| format!("failed to chmod {}", hook_path.display()))?;
+
+    println!("🙏 Created {}", hook_path.display());
+    println!("   The hook runs `cargo bless bs --fail-on-confidence 0.8` before each commit.");
+    println!();
+    println!("   Tip: adjust the threshold or add --policy to suppress known findings.");
+
+    Ok(())
+}
+
+fn run_explain(pattern: &str) -> Result<()> {
+    use colored::Colorize;
+
+    let rules = cargo_bless::suggestions::load_rules();
+    let pattern_lower = pattern.to_lowercase();
+    let matches: Vec<_> = rules
+        .iter()
+        .filter(|r| r.pattern.to_lowercase().contains(&pattern_lower))
+        .collect();
+
+    if matches.is_empty() {
+        bail!(
+            "No rule found for '{pattern}'. Run `cargo bless` on a project to see active suggestions."
+        );
+    }
+
+    println!("🙏 cargo-bless — explain: {}", pattern.bold());
+
+    for rule in matches {
+        println!();
+        println!("  {:<16} {}", "Pattern:".bold(), rule.pattern);
+        println!("  {:<16} {}", "Replace with:".bold(), rule.replacement);
+        println!("  {:<16} {:?}", "Kind:".bold(), rule.kind);
+        println!("  {:<16} {:?}", "Confidence:".bold(), rule.confidence);
+        println!("  {:<16} {:?}", "Migration risk:".bold(), rule.migration_risk);
+        if let Some(ref cond) = rule.condition {
+            println!("  {:<16} {}", "Condition:".bold(), cond);
+        }
+        println!("  {:<16} {}", "Source:".bold(), rule.source);
+        println!();
+        println!("  {}", "Why:".bold());
+        for line in textwrap_rule(&rule.reason) {
+            println!("    {line}");
+        }
+    }
+
+    Ok(())
+}
+
+fn textwrap_rule(s: &str) -> Vec<String> {
+    const WIDTH: usize = 72;
+    let mut lines = Vec::new();
+    let mut current = String::new();
+    for word in s.split_whitespace() {
+        if current.is_empty() {
+            current.push_str(word);
+        } else if current.len() + 1 + word.len() <= WIDTH {
+            current.push(' ');
+            current.push_str(word);
+        } else {
+            lines.push(current.clone());
+            current = word.to_string();
+        }
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+    lines
+}
+
+fn apply_code_audit_fixes(report: &cargo_bless::code_audit::CodeAuditReport) -> Result<()> {
+    use std::collections::BTreeSet;
+
+    let files_to_fix: BTreeSet<&std::path::PathBuf> = report
+        .alerts
+        .iter()
+        .filter(|a| a.kind == cargo_bless::code_audit::BullshitKind::UnwrapAbuse)
+        .map(|a| &a.file)
+        .collect();
+
+    if files_to_fix.is_empty() {
+        return Ok(());
+    }
+
+    let mut total_replacements = 0usize;
+
+    for file in &files_to_fix {
+        let contents = std::fs::read_to_string(file)
+            .with_context(|| format!("failed to read {}", file.display()))?;
+
+        let count = contents.matches(".unwrap()").count();
+        if count == 0 {
+            continue;
+        }
+
+        let backup = file.with_extension("rs.bak");
+        std::fs::write(&backup, &contents)
+            .with_context(|| format!("failed to write backup {}", backup.display()))?;
+
+        let modified = contents.replace(".unwrap()", ".expect(\"TODO: handle this\")");
+        std::fs::write(file, &modified)
+            .with_context(|| format!("failed to write {}", file.display()))?;
+
+        total_replacements += count;
+    }
+
+    println!(
+        "🙏 Fixed {} .unwrap() call(s) across {} file(s). Backups written as *.rs.bak.",
+        total_replacements,
+        files_to_fix.len()
+    );
+    println!("   Review each .expect() and replace the TODO with a real reason.");
 
     Ok(())
 }

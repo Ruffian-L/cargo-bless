@@ -1297,3 +1297,103 @@ edition = "2021"
         stderr2
     );
 }
+
+#[test]
+fn test_explain_flag_shows_rule_details() {
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless").arg("--explain").arg("lazy_static");
+
+    let output = cmd.output().expect("run cargo bless --explain lazy_static");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(
+        stdout.contains("LazyLock"),
+        "should mention the replacement: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("StdReplacement"),
+        "should show the kind: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_explain_flag_unknown_pattern_exits_nonzero() {
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("--explain")
+        .arg("this_crate_does_not_exist_xyz");
+
+    let output = cmd.output().expect("run cargo bless --explain unknown");
+    assert!(
+        !output.status.success(),
+        "unknown pattern should exit non-zero"
+    );
+}
+
+#[test]
+fn test_bs_fix_replaces_unwrap_with_expect() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "fix-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(
+        tmp.path().join("src/main.rs"),
+        "fn main() { let x: Option<u32> = None; let _ = x.unwrap(); }\n",
+    )
+    .expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bs")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--fix");
+
+    let output = cmd.output().expect("run cargo bless bs --fix");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(
+        stdout.contains("Fixed"),
+        "should report fixes applied: {}",
+        stdout
+    );
+
+    let modified = fs::read_to_string(tmp.path().join("src/main.rs")).expect("read modified file");
+    assert!(
+        modified.contains(".expect("),
+        "source should contain .expect(): {}",
+        modified
+    );
+    assert!(
+        !modified.contains(".unwrap()"),
+        "source should no longer contain .unwrap(): {}",
+        modified
+    );
+
+    let backup = tmp.path().join("src/main.rs.bak");
+    assert!(backup.exists(), ".rs.bak backup should be created");
+    let backup_contents = fs::read_to_string(&backup).expect("read backup");
+    assert!(
+        backup_contents.contains(".unwrap()"),
+        "backup should contain original .unwrap(): {}",
+        backup_contents
+    );
+}

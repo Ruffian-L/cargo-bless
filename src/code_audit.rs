@@ -494,7 +494,7 @@ fn scan_line_patterns(code: &str, file: &Path, alerts: &mut Vec<BullshitAlert>) 
                 col + 1,
                 line,
                 "unwrap() is a runtime trap dressed up as confidence.",
-                "Propagate the error with ?, add context, or handle the failure explicitly.",
+                "Replace with .expect(\"reason it can't fail\") for a panic with context, propagate with ?, or handle the None/Err explicitly.",
             ));
         }
 

@@ -103,6 +103,14 @@ pub struct BlessOpts {
     /// Write a starter GitHub Actions workflow to .github/workflows/bless.yml and exit.
     #[arg(long)]
     pub init_ci: bool,
+
+    /// Write a pre-commit git hook that runs the code audit before each commit.
+    #[arg(long)]
+    pub init_hooks: bool,
+
+    /// Show full details for a suggestion pattern (e.g. --explain lazy_static).
+    #[arg(long, value_name = "PATTERN")]
+    pub explain: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -138,4 +146,8 @@ pub struct CodeAuditOpts {
     /// Exit non-zero if any finding has confidence >= this value (0.0–1.0).
     #[arg(long, value_name = "FLOAT")]
     pub fail_on_confidence: Option<f64>,
+
+    /// Auto-fix safe findings: replaces .unwrap() with .expect("TODO") (writes *.rs.bak backups).
+    #[arg(long)]
+    pub fix: bool,
 }
