@@ -2,6 +2,15 @@
 
 All notable changes to `cargo-bless` are logged here.
 
+## 0.2.3 (2026-05-02)
+
+- **`cargo bless --init-ci`:** Writes a ready-to-commit `.github/workflows/bless.yml` that gates PRs on `--fail-on high` and uploads SARIF findings to GitHub code scanning. Exits non-zero if the file already exists.
+- **`cargo bless bs --fail-on-confidence FLOAT`:** Exit gate for code audit — exits non-zero if any finding has confidence ≥ the threshold. Complements SARIF upload for blocking CI jobs.
+- **`[settings].min_confidence` in `bless.toml` now wired:** Sets the confidence floor for code-audit findings; findings below the threshold are suppressed from output. Previously the field was parsed but never applied.
+- **`🔥` → `🙏`:** Replaced fire emoji with praying hands across all output headers and README examples.
+- **Docs fix:** `--all-targets` removed from the "stubbed/rejected" section of `docs/cli-reference.md`; full `cargo bless bs` flag table added.
+- **Integration tests:** Added `test_bs_min_confidence_in_policy_suppresses_low_confidence_findings`, `test_bs_fail_on_confidence_exits_nonzero_when_findings_present`, `test_init_ci_creates_workflow_file`.
+
 ## 0.2.2 (2026-05-02)
 
 - **`cargo bless bs --sarif`:** Outputs findings as SARIF 2.1.0 JSON for GitHub code-scanning / PR annotations. Includes a `runs[].tool.driver.rules` table of all detected rule IDs. Compatible with `upload-sarif` in GitHub Actions workflows.

@@ -146,7 +146,7 @@ flowchart TB
 ```text
 $ cargo bless --workspace --offline
 
-🔥 cargo-bless v0.2.0
+🙏 cargo-bless v0.2.0
 
 📋 Scanning dependencies…
 
@@ -248,7 +248,7 @@ Synthetic screenshots below are trimmed for readability; your tree will differ.
 ### `cargo bless --summary` (paste-friendly roll-up)
 
 ```
-🔥 cargo-bless v0.2.0
+🙏 cargo-bless v0.2.0
 
 📊 Summary — scanned 1 workspace member
    • my-crate — 42 direct deps, 580 total in resolve
@@ -269,7 +269,7 @@ Top patterns:
 ```
 $ cargo bless --audit-code
 
-🔥 cargo-bless v0.2.0
+🙏 cargo-bless v0.2.0
 
 📋 Scanning dependencies...
 

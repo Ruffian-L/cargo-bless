@@ -189,6 +189,9 @@ pub fn config_from_policy(policy: Option<&crate::policy::Policy>) -> CodeAuditCo
     if let Some(policy) = policy {
         config.ignore_paths = policy.code_audit.ignore_paths.clone();
         config.ignore_kinds = policy.code_audit.ignore_kinds.iter().cloned().collect();
+        if policy.settings.min_confidence > 0.0 {
+            config.confidence_threshold = policy.settings.min_confidence as f32;
+        }
     }
     config
 }

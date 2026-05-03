@@ -36,13 +36,15 @@ Invoked as `cargo bless …` once `cargo-bless` is on your `PATH` (`cargo instal
 | `--workspace` | Analyze **every** `workspace.members` entry once. |
 | `--package=P[,…]` | Restrict to workspace members by **`[package].name`** (comma-separated). |
 | `--audit-code` | Run the detector on each scanned member manifest and merge results (sums file counts / alerts). |
+| `--all-targets` | Include `[dev-dependencies]` and `[build-dependencies]` in analysis (default: normal deps only). Also settable via `bless.toml` `[settings].all_targets = true`. |
 | `--update-rules` | Refresh blessed-derived rules in the cache. |
+| `--init-ci` | Write a starter GitHub Actions workflow to `.github/workflows/bless.yml` and exit. |
 | `--policy=PATH` | Explicit **`bless.toml`** (otherwise auto-discovered next to the manifest directory). |
 | `--verbose` | Dump every bullshit finding (text mode).
 
 ### Planned / stubbed flags
 
-Declared but still rejected at runtime (see **`--help`**): **`--all-targets`**, **`--llm`**.
+Declared but still rejected at runtime (see **`--help`**): **`--llm`**.
 
 Hidden compatibility noop: **`--no-audit-code`**.
 
@@ -59,7 +61,16 @@ Top-level fields:
 
 ### `cargo bless bs` flags
 
-Same as **`CodeAuditOpts`** above: **`--manifest-path`**, **`--policy`**, **`--json`**, **`--diff`**, **`--verbose`**.
+| Flag | Description |
+|------|-------------|
+| `--manifest-path=PATH` | Path to the `Cargo.toml` whose source tree should be audited. |
+| `--policy=PATH` | Explicit `bless.toml` for code-audit suppressions. |
+| `--json` | Output findings as unified JSON (`code_audit` key). |
+| `--sarif` | Output findings as SARIF 2.1.0 JSON (for `upload-sarif` in GitHub Actions). |
+| `--diff` | Audit only lines changed in `git diff HEAD`. |
+| `--hardcoded` | Also scan for hardcoded values: magic numbers, API keys, IPs, URLs, credentials. |
+| `--fail-on-confidence=FLOAT` | Exit non-zero if any finding has confidence ≥ this value (0.0–1.0). |
+| `--verbose` | Show every finding instead of a concise summary. |
 
 ## Policy file (`bless.toml`)
 

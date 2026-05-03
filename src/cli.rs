@@ -99,6 +99,10 @@ pub struct BlessOpts {
     /// Show every bullshit detector finding instead of a concise summary.
     #[arg(long)]
     pub verbose: bool,
+
+    /// Write a starter GitHub Actions workflow to .github/workflows/bless.yml and exit.
+    #[arg(long)]
+    pub init_ci: bool,
 }
 
 #[derive(Args, Debug)]
@@ -130,4 +134,8 @@ pub struct CodeAuditOpts {
     /// Output findings as SARIF 2.1.0 JSON (for GitHub code-scanning / PR annotations).
     #[arg(long)]
     pub sarif: bool,
+
+    /// Exit non-zero if any finding has confidence >= this value (0.0–1.0).
+    #[arg(long, value_name = "FLOAT")]
+    pub fail_on_confidence: Option<f64>,
 }
