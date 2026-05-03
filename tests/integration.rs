@@ -1397,3 +1397,208 @@ edition = "2021"
         backup_contents
     );
 }
+
+#[test]
+fn test_bs_fix_dry_run_prints_preview_without_writing() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+    let src = tmp.path().join("src/main.rs");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "fix-dry-run-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    let original = "fn main() { let x: Option<u32> = None; let _ = x.unwrap(); }\n";
+    fs::write(&src, original).expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bs")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--fix")
+        .arg("--dry-run");
+
+    let output = cmd.output().expect("run cargo bless bs --fix --dry-run");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(
+        stdout.contains("Dry-run"),
+        "should say dry-run: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("would be replaced"),
+        "should say what would be replaced: {}",
+        stdout
+    );
+
+    let after = fs::read_to_string(&src).expect("read file after dry-run");
+    assert_eq!(
+        after, original,
+        "source file must not be modified by --dry-run"
+    );
+    let backup = tmp.path().join("src/main.rs.bak");
+    assert!(!backup.exists(), "no backup should be written during --dry-run");
+}
+
+#[test]
+fn test_bs_detects_bool_comparison() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "bool-cmp-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(
+        tmp.path().join("src/main.rs"),
+        "fn main() { let x = true; if x == true { println!(\"yes\"); } }\n",
+    )
+    .expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bs").arg("--manifest-path").arg(&manifest);
+
+    let output = cmd.output().expect("run cargo-bless bs");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(
+        stdout.contains("redundant bool"),
+        "should flag redundant bool comparison: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_bs_detects_string_anti_pattern() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "string-ap-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(
+        tmp.path().join("src/main.rs"),
+        "fn takes_str(s: &str) { println!(\"{s}\"); }\nfn main() { let x = 42u32; takes_str(x.to_string().as_str()); }\n",
+    )
+    .expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bs").arg("--manifest-path").arg(&manifest);
+
+    let output = cmd.output().expect("run cargo-bless bs");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(
+        stdout.contains("string anti-pattern"),
+        "should flag .to_string().as_str() anti-pattern: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_explain_openssl_rule() {
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless").arg("--explain").arg("openssl");
+
+    let output = cmd.output().expect("run cargo bless --explain openssl");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(
+        stdout.contains("rustls"),
+        "should mention rustls as replacement: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("ModernAlternative"),
+        "should show ModernAlternative kind: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_simple_logger_rule_fires() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "simple-logger-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+simple_logger = "4"
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(tmp.path().join("src/main.rs"), "fn main() {}\n").expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--offline");
+
+    let output = cmd.output().expect("run cargo-bless");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(
+        stdout.contains("simple_logger"),
+        "should flag simple_logger: {}",
+        stdout
+    );
+    assert!(
+        stdout.contains("tracing"),
+        "should suggest tracing: {}",
+        stdout
+    );
+}

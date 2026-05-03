@@ -26,6 +26,8 @@ pub enum BullshitKind {
     MutexAbuse,
     TodoUnimplemented,
     RefCellAbuse,
+    BoolComparison,
+    StringAntiPattern,
 }
 
 impl BullshitKind {
@@ -43,6 +45,8 @@ impl BullshitKind {
             Self::MutexAbuse => "mutex abuse",
             Self::TodoUnimplemented => "todo/unimplemented",
             Self::RefCellAbuse => "RefCell abuse",
+            Self::BoolComparison => "redundant bool comparison",
+            Self::StringAntiPattern => "string anti-pattern",
         }
     }
 }
@@ -539,6 +543,42 @@ fn scan_line_patterns(code: &str, file: &Path, alerts: &mut Vec<BullshitAlert>) 
                 line,
                 "Broad collection imports can signal cargo-cult scaffolding.",
                 "Import the collection you actually use, or qualify rare uses inline.",
+            ));
+        }
+
+        if line.contains("== true") || line.contains("== false")
+            || line.contains("!= true") || line.contains("!= false")
+        {
+            let col = line.find("== true")
+                .or_else(|| line.find("== false"))
+                .or_else(|| line.find("!= true"))
+                .or_else(|| line.find("!= false"))
+                .unwrap_or(0) + 1;
+            alerts.push(alert_from_line(
+                BullshitKind::BoolComparison,
+                0.68,
+                file,
+                line_idx + 1,
+                col,
+                line,
+                "Comparing a boolean expression to `true` or `false` is redundant.",
+                "Use the expression directly (`if x`) or its negation (`if !x`) instead of `== true` / `== false`.",
+            ));
+        }
+
+        if line.contains(".to_string().as_str()") || line.contains(".to_owned().as_str()") {
+            let col = line.find(".to_string().as_str()")
+                .or_else(|| line.find(".to_owned().as_str()"))
+                .unwrap_or(0) + 1;
+            alerts.push(alert_from_line(
+                BullshitKind::StringAntiPattern,
+                0.74,
+                file,
+                line_idx + 1,
+                col,
+                line,
+                "Converting to String then immediately borrowing as &str creates an unnecessary temporary.",
+                "Use `.as_str()` on an existing String, or pass a `&str` directly without allocating.",
             ));
         }
     }
