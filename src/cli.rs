@@ -111,6 +111,10 @@ pub struct BlessOpts {
     /// Show full details for a suggestion pattern (e.g. --explain lazy_static).
     #[arg(long, value_name = "PATTERN")]
     pub explain: Option<String>,
+
+    /// Skip the security advisory check (osv.dev) even when online.
+    #[arg(long)]
+    pub no_advisories: bool,
 }
 
 #[derive(Args, Debug)]
