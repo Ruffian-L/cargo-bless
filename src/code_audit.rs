@@ -28,6 +28,8 @@ pub enum BullshitKind {
     RefCellAbuse,
     BoolComparison,
     StringAntiPattern,
+    DiscardedError,
+    LossyUtf8,
 }
 
 impl BullshitKind {
@@ -47,6 +49,8 @@ impl BullshitKind {
             Self::RefCellAbuse => "RefCell abuse",
             Self::BoolComparison => "redundant bool comparison",
             Self::StringAntiPattern => "string anti-pattern",
+            Self::DiscardedError => "discarded error",
+            Self::LossyUtf8 => "lossy UTF-8 conversion",
         }
     }
 }
@@ -579,6 +583,54 @@ fn scan_line_patterns(code: &str, file: &Path, alerts: &mut Vec<BullshitAlert>) 
                 line,
                 "Converting to String then immediately borrowing as &str creates an unnecessary temporary.",
                 "Use `.as_str()` on an existing String, or pass a `&str` directly without allocating.",
+            ));
+        }
+
+        // .ok() used as a statement silently discards an error
+        if line.trim_end().ends_with(".ok();") || line.contains(").ok();") {
+            let col = line.find(".ok()").unwrap_or(0) + 1;
+            alerts.push(alert_from_line(
+                BullshitKind::DiscardedError,
+                0.76,
+                file,
+                line_idx + 1,
+                col,
+                line,
+                "Calling `.ok()` as a statement silently discards the error variant.",
+                "Propagate with `?`, handle the `Err`, or at minimum log before discarding.",
+            ));
+        }
+
+        // let _ = discards the return value (often a Result)
+        let trimmed_start = line.trim_start();
+        if trimmed_start.starts_with("let _ =")
+            && !trimmed_start.starts_with("let _ = ()")
+            && trimmed_start.contains('(')
+        {
+            let col = line.find("let _ =").unwrap_or(0) + 1;
+            alerts.push(alert_from_line(
+                BullshitKind::DiscardedError,
+                0.65,
+                file,
+                line_idx + 1,
+                col,
+                line,
+                "`let _ = expr` silently ignores the return value — likely a discarded Result or error.",
+                "Handle the value explicitly, use `drop()` with a comment explaining why, or propagate.",
+            ));
+        }
+
+        if line.contains("from_utf8_lossy(") {
+            let col = line.find("from_utf8_lossy(").unwrap_or(0) + 1;
+            alerts.push(alert_from_line(
+                BullshitKind::LossyUtf8,
+                0.70,
+                file,
+                line_idx + 1,
+                col,
+                line,
+                "`from_utf8_lossy` silently replaces invalid UTF-8 bytes with U+FFFD, corrupting binary data.",
+                "Use `from_utf8` and handle the error, or work with raw bytes via `OsStr` / `io::Write::write_all`.",
             ));
         }
     }

@@ -399,6 +399,42 @@ pub struct JsonReportUnified<'a> {
     pub code_audit: Option<&'a CodeAuditReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hardcoded_values: Option<&'a [crate::bs_detector::BSHit]>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub security_advisories: Vec<crate::advisories::CrateAdvisories>,
+}
+
+pub fn render_advisories(advisories: &[crate::advisories::CrateAdvisories]) {
+    if advisories.is_empty() {
+        return;
+    }
+    println!();
+    println!("{}", "🔒 Security advisories".bold());
+    for hit in advisories {
+        let count = hit.advisories.len();
+        println!(
+            "  {} {} {}",
+            "⚠".yellow(),
+            hit.crate_name.yellow().bold(),
+            format!("({count} advisory{})", if count == 1 { "" } else { "ies" }).dimmed()
+        );
+        for adv in &hit.advisories {
+            let cve_tag = adv
+                .cve()
+                .map(|c| format!(" · {c}"))
+                .unwrap_or_default();
+            println!(
+                "     {} {}{}",
+                adv.id.red().bold(),
+                adv.summary.dimmed(),
+                cve_tag.dimmed()
+            );
+        }
+    }
+    println!();
+    println!(
+        "{}",
+        "  Run `cargo audit` for patch guidance. Add affected crates to bless.toml ignore_packages to suppress.".dimmed()
+    );
 }
 
 pub fn render_unified_json(report: JsonReportUnified<'_>) {

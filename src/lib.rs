@@ -1,3 +1,4 @@
+pub mod advisories;
 pub mod bs_detector;
 pub mod code_audit;
 pub mod feedback;

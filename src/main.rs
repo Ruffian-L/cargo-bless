@@ -174,12 +174,29 @@ fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
         } else {
             None
         };
+        let advisories_for_json = if !opts.offline
+            && !policy.as_ref().is_some_and(|p| p.settings.offline)
+            && !opts.no_advisories
+        {
+            let crates: Vec<&str> = snapshots
+                .iter()
+                .flat_map(|s| s.deps.iter())
+                .filter(|d| d.is_direct)
+                .map(|d| d.name.as_str())
+                .collect::<std::collections::HashSet<_>>()
+                .into_iter()
+                .collect();
+            cargo_bless::advisories::fetch_advisories_batch(&crates)
+        } else {
+            Vec::new()
+        };
         let report = cargo_bless::output::JsonReportUnified {
             cargo_bless_version: env!("CARGO_PKG_VERSION"),
             workspace_scan: opts.workspace || snapshots.len() > 1,
             packages: packages_for_json,
             code_audit: merged_audit.as_ref(),
             hardcoded_values: None,
+            security_advisories: advisories_for_json,
         };
         cargo_bless::output::render_unified_json(report);
         maybe_fail_on_exit(&all_suggestions, &fail_levels)?;
@@ -340,6 +357,24 @@ fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
 
     cargo_bless::output::render_packages_modernization(&views, &intel);
 
+    // Security advisory check (osv.dev) — one batch call for all direct deps
+    if !effective_offline && !opts.no_advisories {
+        let direct_crates: Vec<&str> = {
+            let mut seen = std::collections::HashSet::new();
+            snapshots
+                .iter()
+                .flat_map(|s| s.deps.iter())
+                .filter(|d| d.is_direct)
+                .map(|d| d.name.as_str())
+                .filter(|n| seen.insert(*n))
+                .collect()
+        };
+        if !direct_crates.is_empty() {
+            let hits = cargo_bless::advisories::fetch_advisories_batch(&direct_crates);
+            cargo_bless::output::render_advisories(&hits);
+        }
+    }
+
     if run_code_audit {
         let reports: Vec<_> = snapshots
             .iter()
@@ -496,6 +531,7 @@ fn run_code_audit_command(opts: cli::CodeAuditOpts) -> Result<()> {
             packages: Vec::new(),
             code_audit: Some(&report),
             hardcoded_values: if opts.hardcoded { Some(&bs_hits) } else { None },
+            security_advisories: Vec::new(),
         };
         cargo_bless::output::render_unified_json(unified);
     } else {
