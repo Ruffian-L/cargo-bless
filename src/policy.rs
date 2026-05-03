@@ -211,6 +211,7 @@ suppress = true
             migration_risk: crate::suggestions::MigrationRisk::Low,
             autofix_safety: crate::suggestions::AutofixSafety::ManualOnly,
             evidence_source: crate::suggestions::EvidenceSource::Heuristic,
+            package: None,
         }];
 
         let filtered = apply_policy(suggestions, &policy);
@@ -242,6 +243,7 @@ suppress = true
                 migration_risk: crate::suggestions::MigrationRisk::Medium,
                 autofix_safety: crate::suggestions::AutofixSafety::ManualOnly,
                 evidence_source: crate::suggestions::EvidenceSource::Heuristic,
+                package: None,
             })
             .collect();
 
@@ -268,6 +270,7 @@ suppress = true
                 migration_risk: crate::suggestions::MigrationRisk::Medium,
                 autofix_safety: crate::suggestions::AutofixSafety::ManualOnly,
                 evidence_source: crate::suggestions::EvidenceSource::Heuristic,
+                package: None,
             },
             crate::suggestions::Suggestion {
                 kind: crate::suggestions::SuggestionKind::ModernAlternative,
@@ -280,6 +283,7 @@ suppress = true
                 migration_risk: crate::suggestions::MigrationRisk::Medium,
                 autofix_safety: crate::suggestions::AutofixSafety::ManualOnly,
                 evidence_source: crate::suggestions::EvidenceSource::Heuristic,
+                package: None,
             },
         ];
 

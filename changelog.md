@@ -2,6 +2,22 @@
 
 All notable changes to `cargo-bless` are logged here.
 
+## 0.2.1 (2026-05-02)
+
+- **`--all-targets`:** Widens "direct dependency" to include `[dev-dependencies]` and `[build-dependencies]`. Without the flag, only `[dependencies]` are analyzed (previous behaviour silently included dev-deps; now opt-in). Removes the "not implemented" guard and exposes the flag in `--help`.
+- **`cargo bless bs --hardcoded`:** Wires the previously-dormant `bs_detector` module into the CLI. Scans for hardcoded values — magic numbers, API keys, IPs, URLs, file paths, credentials, timeouts. Findings appear in terminal output and in a `hardcoded_values` key in `--json` output.
+- **`ArcAbuse` detector:** `code_audit` now emits `ArcAbuse` findings (0.62 confidence) for `Arc<String>`, `Arc<Vec<…>>`, and `Arc<Box<…>>` — value types needlessly wrapped in shared ownership.
+- **Integration tests:** Added `test_package_flag_filters_workspace_member`, `test_explicit_policy_flag_suppresses_suggestion`, `test_bs_hardcoded_flag_reports_hardcoded_values`.
+
+## 0.2.0 (2026-05-02)
+
+- **`--workspace` / `--package`:** Scan every `workspace.members` crate (single `cargo metadata`); **`--package`** filters by **`[package].name`**; per-member suggestions + autofix loops each member **`Cargo.toml`**. Virtual workspace roots tolerate missing **`resolve.root`** when iterating members.
+- **`--summary`:** Concise dependency roll-up (**counts**, **impact tallies**, **deduped `crate → reco` bullets**); skips crates.io/GitHub intel. Compared with **`--feedback`** vs **`--json`** in `README.md` and `docs/cli-reference.md`.
+- **`--fail-on`:** Exit non-zero when any retained suggestion’s **impact** matches **`low`** / **`medium`** / **`high`** / **`critical`** (**critical aliases high** for dependency tier until code-audit gating arrives).
+- **JSON breaking layout:** **`cargo_bless_version`**, **`workspace_scan`**, **`packages[]`**, per-package **`dependency_suggestions`**, nullable **`code_audit`**; **`cargo bless bs --json`** uses **`packages: []`** + audit blob.
+- **Fix trust copy:** **`--dry-run`** / **`--fix`** Cargo.toml-only messaging across README + `main` banners + **`fix::apply`** stderr + modernization footer.
+- **README visuals:** shields + hero/pipeline PNGs (under **`docs/images/`**, readme links use **raw.githubusercontent.com** so [crates.io](https://crates.io/) README renders images), Mermaid pipeline & command-picker flows, workspace mock output, **`--json`** / **`--fail-on`** Action snippet, autofix **`Cargo.toml`** before/after.
+
 ## 0.1.8 (2026-05-02)
 
 - Published to [crates.io/cargo-bless/0.1.8](https://crates.io/crates/cargo-bless/0.1.8). GitHub: [PR #33](https://github.com/Ruffian-L/cargo-bless/pull/33).
