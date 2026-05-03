@@ -126,4 +126,8 @@ pub struct CodeAuditOpts {
     /// Also scan for hardcoded values: magic numbers, API keys, IPs, URLs, credentials.
     #[arg(long)]
     pub hardcoded: bool,
+
+    /// Output findings as SARIF 2.1.0 JSON (for GitHub code-scanning / PR annotations).
+    #[arg(long)]
+    pub sarif: bool,
 }

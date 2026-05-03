@@ -2,6 +2,12 @@
 
 All notable changes to `cargo-bless` are logged here.
 
+## 0.2.2 (2026-05-02)
+
+- **`cargo bless bs --sarif`:** Outputs findings as SARIF 2.1.0 JSON for GitHub code-scanning / PR annotations. Includes a `runs[].tool.driver.rules` table of all detected rule IDs. Compatible with `upload-sarif` in GitHub Actions workflows.
+- **Policy gates:** `fail_on` and `settings.all_targets` in `bless.toml` are now fully wired. Setting `fail_on = ["high"]` in the policy file gates CI without repeating the flag on every invocation; `settings.all_targets = true` widens dep scanning from the policy file. CLI flags take precedence over policy values when both are set.
+- **Integration tests:** Added `test_policy_fail_on_gates_without_cli_flag`, `test_bs_sarif_flag_outputs_valid_sarif`.
+
 ## 0.2.1 (2026-05-02)
 
 - **`--all-targets`:** Widens "direct dependency" to include `[dev-dependencies]` and `[build-dependencies]`. Without the flag, only `[dependencies]` are analyzed (previous behaviour silently included dev-deps; now opt-in). Removes the "not implemented" guard and exposes the flag in `--help`.

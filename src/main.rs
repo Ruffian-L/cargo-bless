@@ -24,15 +24,6 @@ fn use_tagged_suggestions(opts: &cli::BlessOpts) -> bool {
     opts.workspace || !opts.package.is_empty()
 }
 
-fn load_snapshots(opts: &cli::BlessOpts) -> Result<Vec<cargo_bless::parser::PackageResult>> {
-    let manifest = opts.manifest_path.as_deref();
-    cargo_bless::parser::get_package_snapshots(
-        manifest,
-        opts.workspace,
-        &opts.package,
-        opts.all_targets,
-    )
-}
 
 fn parse_fail_on_levels(
     raw: &[String],
@@ -100,18 +91,33 @@ fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
         return run_feedback_command(opts);
     }
 
-    let fail_levels = parse_fail_on_levels(&opts.fail_on)?;
+    let manifest = opts.manifest_path.as_deref();
+    let policy = load_policy(opts.policy.as_deref(), manifest)?;
+
+    let effective_fail_on: Vec<String> = if opts.fail_on.is_empty() {
+        policy.as_ref()
+            .and_then(|p| p.fail_on.clone())
+            .unwrap_or_default()
+    } else {
+        opts.fail_on.clone()
+    };
+    let fail_levels = parse_fail_on_levels(&effective_fail_on)?;
 
     if opts.summary {
-        return run_summary_mode(&opts, &fail_levels);
+        return run_summary_mode(&opts, &fail_levels, policy.as_ref());
     }
 
-    let manifest = opts.manifest_path.as_deref();
     let run_code_audit = opts.audit_code;
-    let policy = load_policy(opts.policy.as_deref(), manifest)?;
     let code_audit_config = cargo_bless::code_audit::config_from_policy(policy.as_ref());
     let tagged = use_tagged_suggestions(&opts);
-    let snapshots = load_snapshots(&opts)?;
+    let effective_all_targets = opts.all_targets
+        || policy.as_ref().is_some_and(|p| p.settings.all_targets);
+    let snapshots = cargo_bless::parser::get_package_snapshots(
+        manifest,
+        opts.workspace,
+        &opts.package,
+        effective_all_targets,
+    )?;
     let rules = cargo_bless::suggestions::load_rules();
 
     let mut per_pkg_suggestions: Vec<Vec<cargo_bless::suggestions::Suggestion>> = Vec::new();
@@ -376,11 +382,18 @@ fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
 fn run_summary_mode(
     opts: &cli::BlessOpts,
     fail_levels: &Option<HashSet<cargo_bless::suggestions::Impact>>,
+    policy: Option<&cargo_bless::policy::Policy>,
 ) -> Result<()> {
     let manifest = opts.manifest_path.as_deref();
-    let policy = load_policy(opts.policy.as_deref(), manifest)?;
     let tagged = use_tagged_suggestions(opts);
-    let snapshots = load_snapshots(opts)?;
+    let effective_all_targets = opts.all_targets
+        || policy.is_some_and(|p| p.settings.all_targets);
+    let snapshots = cargo_bless::parser::get_package_snapshots(
+        manifest,
+        opts.workspace,
+        &opts.package,
+        effective_all_targets,
+    )?;
     let rules = cargo_bless::suggestions::load_rules();
 
     let mut all = Vec::new();
@@ -396,7 +409,7 @@ fn run_summary_mode(
         } else {
             cargo_bless::suggestions::analyze(Some(mpath), &snap.deps, &rules)
         };
-        all.extend(apply_policy(raw, policy.as_ref()));
+        all.extend(apply_policy(raw, policy));
     }
 
     let scan_stats: Vec<(&str, usize, usize)> = snapshots
@@ -465,7 +478,9 @@ fn run_code_audit_command(opts: cli::CodeAuditOpts) -> Result<()> {
         Vec::new()
     };
 
-    if opts.json {
+    if opts.sarif {
+        cargo_bless::output::render_sarif(&report);
+    } else if opts.json {
         let unified = cargo_bless::output::JsonReportUnified {
             cargo_bless_version: env!("CARGO_PKG_VERSION"),
             workspace_scan: false,

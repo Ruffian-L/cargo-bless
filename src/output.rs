@@ -435,3 +435,154 @@ pub fn render_json(suggestions: &[Suggestion]) {
         Err(e) => eprintln!("cargo-bless: failed to serialize JSON output: {}", e),
     }
 }
+
+// ── SARIF 2.1.0 output ───────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+struct SarifRoot {
+    version: &'static str,
+    #[serde(rename = "$schema")]
+    schema: &'static str,
+    runs: Vec<SarifRun>,
+}
+
+#[derive(Serialize)]
+struct SarifRun {
+    tool: SarifTool,
+    results: Vec<SarifResult>,
+}
+
+#[derive(Serialize)]
+struct SarifTool {
+    driver: SarifDriver,
+}
+
+#[derive(Serialize)]
+struct SarifDriver {
+    name: &'static str,
+    version: &'static str,
+    #[serde(rename = "informationUri")]
+    information_uri: &'static str,
+    rules: Vec<SarifRule>,
+}
+
+#[derive(Serialize)]
+struct SarifRule {
+    id: String,
+    name: String,
+    #[serde(rename = "shortDescription")]
+    short_description: SarifMessage,
+}
+
+#[derive(Serialize)]
+struct SarifResult {
+    #[serde(rename = "ruleId")]
+    rule_id: String,
+    level: &'static str,
+    message: SarifMessage,
+    locations: Vec<SarifLocation>,
+}
+
+#[derive(Serialize)]
+struct SarifLocation {
+    #[serde(rename = "physicalLocation")]
+    physical_location: SarifPhysicalLocation,
+}
+
+#[derive(Serialize)]
+struct SarifPhysicalLocation {
+    #[serde(rename = "artifactLocation")]
+    artifact_location: SarifArtifactLocation,
+    region: SarifRegion,
+}
+
+#[derive(Serialize)]
+struct SarifArtifactLocation {
+    uri: String,
+    #[serde(rename = "uriBaseId")]
+    uri_base_id: &'static str,
+}
+
+#[derive(Serialize)]
+struct SarifRegion {
+    #[serde(rename = "startLine")]
+    start_line: usize,
+}
+
+#[derive(Serialize)]
+struct SarifMessage {
+    text: String,
+}
+
+pub fn render_sarif(report: &CodeAuditReport) {
+    use std::collections::BTreeMap;
+
+    // Collect unique rule IDs for the driver rules table
+    let mut rule_descriptions: BTreeMap<String, String> = BTreeMap::new();
+    for alert in &report.alerts {
+        rule_descriptions
+            .entry(format!("{:?}", alert.kind))
+            .or_insert_with(|| alert.why_bs.clone());
+    }
+
+    let rules: Vec<SarifRule> = rule_descriptions
+        .iter()
+        .map(|(id, desc)| SarifRule {
+            id: id.clone(),
+            name: id.clone(),
+            short_description: SarifMessage { text: desc.clone() },
+        })
+        .collect();
+
+    let results: Vec<SarifResult> = report
+        .alerts
+        .iter()
+        .map(|a| {
+            let uri = a
+                .file
+                .to_string_lossy()
+                .strip_prefix("./")
+                .unwrap_or(a.file.to_string_lossy().as_ref())
+                .to_string();
+            SarifResult {
+                rule_id: format!("{:?}", a.kind),
+                level: "warning",
+                message: SarifMessage {
+                    text: format!("{} — {}", a.why_bs, a.suggestion),
+                },
+                locations: vec![SarifLocation {
+                    physical_location: SarifPhysicalLocation {
+                        artifact_location: SarifArtifactLocation {
+                            uri,
+                            uri_base_id: "%SRCROOT%",
+                        },
+                        region: SarifRegion {
+                            start_line: a.line,
+                        },
+                    },
+                }],
+            }
+        })
+        .collect();
+
+    let sarif = SarifRoot {
+        version: "2.1.0",
+        schema: "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+        runs: vec![SarifRun {
+            tool: SarifTool {
+                driver: SarifDriver {
+                    name: "cargo-bless",
+                    version: env!("CARGO_PKG_VERSION"),
+                    information_uri: "https://github.com/Ruffian-L/cargo-bless",
+                    rules,
+                },
+            },
+            results,
+        }],
+    };
+
+    match serde_json::to_string_pretty(&sarif) {
+        Ok(json) => println!("{json}"),
+        Err(e) => eprintln!("cargo-bless: failed to serialize SARIF output: {e}"),
+    }
+}
