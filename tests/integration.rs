@@ -1602,3 +1602,134 @@ simple_logger = "4"
         stdout
     );
 }
+
+#[test]
+fn test_bs_detects_discarded_error_ok_statement() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "discard-err-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(
+        tmp.path().join("src/main.rs"),
+        "use std::fs;\nfn main() { fs::remove_file(\"tmp\").ok(); }\n",
+    )
+    .expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bs").arg("--manifest-path").arg(&manifest);
+
+    let output = cmd.output().expect("run cargo-bless bs");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(
+        stdout.contains("discarded error"),
+        "should flag .ok() as discarded error: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_bs_detects_lossy_utf8() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "lossy-utf8-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(
+        tmp.path().join("src/main.rs"),
+        "fn main() { let b: &[u8] = b\"hello\"; println!(\"{}\", String::from_utf8_lossy(b)); }\n",
+    )
+    .expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bs").arg("--manifest-path").arg(&manifest);
+
+    let output = cmd.output().expect("run cargo-bless bs");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(
+        stdout.contains("lossy UTF-8"),
+        "should flag from_utf8_lossy: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_no_advisories_flag_accepted() {
+    cargo_bless_cmd()
+        .arg("--no-advisories")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_advisories_skipped_in_offline_mode() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "offline-adv-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = "1"
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(tmp.path().join("src/main.rs"), "fn main() {}\n").expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--offline");
+
+    let output = cmd.output().expect("run cargo-bless --offline");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+    assert!(
+        !stdout.contains("Security advisories"),
+        "offline mode should not fetch advisories: {}",
+        stdout
+    );
+}
