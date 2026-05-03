@@ -2,6 +2,32 @@
 
 All notable changes to `cargo-bless` are logged here.
 
+## 0.3.1 (2026-05-03)
+
+- **False-positive elimination:** `#[test]` and `#[cfg(test)]` attribute+item pairs are now masked via tree-sitter before running any detector. Findings inside test functions no longer appear in the default report.
+- **Scan scope tightened:** Default scan is `src/` only. Use `--include-tests` (CLI) or `include_tests = true` in `[code_audit]` of `bless.toml` to also scan `tests/`, `examples/`, and `benches/`.
+- **Non-`src/` layouts fixed:** Crates that keep `.rs` files directly in the crate root (no `src/` subdirectory) are now correctly scanned instead of returning 0 files.
+- **125 tests pass.**
+
+## 0.3.0 (2026-05-03)
+
+- **Security advisories:** Direct dependencies are checked against [osv.dev](https://osv.dev/) in a single batch call. Findings (advisory ID, summary, CVE alias) appear in the human-readable report and in the `security_advisories` key of `--json` output. Skipped when `--offline`.
+- **`--no-advisories`:** Skip the osv.dev check even when online.
+- **New detectors:**
+  - `DiscardedError` — detects `.ok()` as a statement and `let _ = expr()` patterns that silently swallow errors.
+  - `LossyUtf8` — detects `String::from_utf8_lossy(…)` calls that may silently corrupt non-UTF-8 bytes.
+- **New rules (+5, 50 total):** `simple_logger`, `openssl`, `termion`, `getopts`, `fern`.
+- **JSON `security_advisories` field:** Added to `JsonReportUnified`; `#[serde(skip_serializing_if = "Vec::is_empty")]` so old parsers aren't surprised.
+
+## 0.2.7 (2026-05-03)
+
+- **New detectors:**
+  - `BoolComparison` — flags `== true`, `== false`, `!= true`, `!= false` (redundant boolean comparisons).
+  - `StringAntiPattern` — flags `.to_string().as_str()` and `.to_owned().as_str()` (allocate then immediately re-borrow).
+- **`cargo bless bs --fix --dry-run`:** Preview what `--fix` would change without writing files or backups.
+- **New rules (+5, 45 → 50 not yet in this release — landed in 0.3.0).**
+- **Integration tests:** `test_bs_fix_dry_run_prints_preview_without_writing`, `test_bs_detects_bool_comparison`, `test_bs_detects_string_anti_pattern`.
+
 ## 0.2.6 (2026-05-03)
 
 - **`cargo bless --explain PATTERN`:** Show full details for any suggestion rule — kind, confidence, migration risk, reason, source. Fuzzy-matches on pattern name. Exits non-zero if no rule is found.
