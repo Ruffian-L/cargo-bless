@@ -102,6 +102,45 @@ lazy_static = "1"
 }
 
 #[test]
+fn test_policy_fail_on_gates_without_cli_flag() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+    let policy_path = tmp.path().join("bless.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "gate-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lazy_static = "1"
+"#,
+    )
+    .expect("write Cargo.toml");
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(tmp.path().join("src/main.rs"), "fn main() {}").expect("write main.rs");
+
+    fs::write(&policy_path, "fail_on = [\"high\"]\n").expect("write bless.toml");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bless")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--policy")
+        .arg(&policy_path)
+        .arg("--offline");
+
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "exiting with non-zero status: at least one dependency suggestion matched --fail-on",
+    ));
+}
+
+#[test]
 fn test_dry_run_without_fix_exits_nonzero() {
     cargo_bless_cmd()
         .arg("--dry-run")
@@ -1031,5 +1070,64 @@ edition = "2021"
         stdout.contains("192.168.1.100"),
         "hardcoded IP should be detected: {}",
         stdout
+    );
+}
+
+#[test]
+fn test_bs_sarif_flag_outputs_valid_sarif() {
+    use std::fs;
+    use tempfile::TempDir;
+
+    let tmp = TempDir::new().expect("temp dir");
+    let manifest = tmp.path().join("Cargo.toml");
+
+    fs::write(
+        &manifest,
+        r#"[package]
+name = "sarif-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"#,
+    )
+    .expect("write Cargo.toml");
+
+    fs::create_dir_all(tmp.path().join("src")).expect("create src");
+    fs::write(
+        tmp.path().join("src/main.rs"),
+        "fn main() { let x: Option<u32> = None; let _ = x.unwrap(); }\n",
+    )
+    .expect("write main.rs");
+
+    let mut cmd = Command::cargo_bin("cargo-bless").expect("binary should exist");
+    cmd.arg("bs")
+        .arg("--manifest-path")
+        .arg(&manifest)
+        .arg("--sarif");
+
+    let output = cmd.output().expect("run cargo-bless bs --sarif");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(output.status.success(), "should exit 0: {}", stdout);
+
+    let sarif: serde_json::Value =
+        serde_json::from_str(&stdout).expect("--sarif output must be valid JSON");
+
+    assert_eq!(
+        sarif["version"].as_str().unwrap_or(""),
+        "2.1.0",
+        "SARIF version must be 2.1.0"
+    );
+    assert!(
+        sarif["runs"].is_array(),
+        "SARIF must have a 'runs' array: {}",
+        stdout
+    );
+    let driver_name = &sarif["runs"][0]["tool"]["driver"]["name"];
+    assert_eq!(
+        driver_name.as_str().unwrap_or(""),
+        "cargo-bless",
+        "driver name must be cargo-bless"
     );
 }
