@@ -2,6 +2,13 @@
 
 All notable changes to `cargo-bless` are logged here.
 
+## 0.2.5 (2026-05-02)
+
+- **New rule: `async-trait`** → native async fn in traits (Rust 1.75+). Medium confidence; notes the `dyn Trait` exception. 43 rules total.
+- **New code audit detector: `TodoUnimplemented`** — detects `todo!()` and `unimplemented!()` calls in production paths (0.75 confidence). These will panic at runtime.
+- **New code audit detector: `RefCellAbuse`** — detects `RefCell<T>` usage (0.60 confidence). Interior mutability defers borrow checking to runtime.
+- **`--init-ci` workflow improved** — generated `.github/workflows/bless.yml` now includes `dtolnay/rust-toolchain@stable` and `Swatinem/rust-cache@v2` for deterministic toolchain and dependency caching.
+
 ## 0.2.4 (2026-05-02)
 
 - **Rules database: +9 new hand-authored rules** (42 total, up from 33):
