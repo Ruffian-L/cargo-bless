@@ -43,6 +43,11 @@ struct Subgroup {
 struct Purpose {
     name: String,
     notes: Option<String>,
+    // blessed.rs added purposes that point at the standard library and carry
+    // only a `see_also` list (e.g. "Lazy static variable initialization" →
+    // std's LazyLock), omitting `recommendations` entirely. Default to empty
+    // so those entries deserialize instead of failing the whole fetch.
+    #[serde(default)]
     recommendations: Vec<Recommendation>,
 }
 
