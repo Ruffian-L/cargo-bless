@@ -2,6 +2,10 @@
 
 A Cargo subcommand that checks your dependencies against [blessed.rs](https://blessed.rs/) recommendations and suggests modern alternatives.
 
+This project exists to make it easier to follow high-quality recommendations from the Rust ecosystem. It is built on top of work by many others.
+
+> Updated 07/06/2026: added attributions and thank yous.
+
 <div align="center">
 
 ![cargo-bless — bless your dependency tree](https://raw.githubusercontent.com/Ruffian-L/cargo-bless/main/docs/images/readme-banner.svg)
@@ -467,6 +471,18 @@ These files also live under `docs/` in the repository (links work from GitHub an
 - [CLI reference](https://github.com/Ruffian-L/cargo-bless/blob/main/docs/cli-reference.md) — flags and subcommands
 - [Contributing](https://github.com/Ruffian-L/cargo-bless/blob/main/docs/contributing.md) — build, test, release checklist
 
+## Credits and Thank Yous
+
+This project builds directly on work by many others in the Rust ecosystem.
+
+- [blessed.rs](https://blessed.rs/) by nicoburns and contributors (core curated recommendations and patterns).
+- Authors and maintainers of its dependencies: clap, cargo_metadata, toml_edit, reqwest, serde, tree-sitter, and others (full list in [Cargo.toml](Cargo.toml)).
+- Data sources: crates.io, GitHub, [osv.dev](https://osv.dev/).
+
+Thank you to everyone maintaining these projects and the broader Rust community.
+
 ## License
 
-MIT -- see [LICENSE-MIT](LICENSE-MIT).
+This project is licensed under the MIT License — see [LICENSE-MIT](LICENSE-MIT).
+
+The `license` field in [Cargo.toml](Cargo.toml) declares the license for the published crate. Dependency licenses are declared by their respective crates (visible on crates.io or via `cargo metadata`). This tool itself is not a license compliance scanner (see `cargo deny`, `cargo about`, etc. for that).
