@@ -221,10 +221,9 @@ pub fn parse_github_url(url: &str) -> Option<(String, String)> {
     let url = url.trim().trim_end_matches('/');
 
     // Find the github.com part
-    let after_github = if let Some(pos) = url.find("github.com/") {
+    let after_github = {
+        let pos = url.find("github.com/")?;
         &url[pos + "github.com/".len()..]
-    } else {
-        return None;
     };
 
     let parts: Vec<&str> = after_github.splitn(3, '/').collect();
