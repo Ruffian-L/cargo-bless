@@ -2,6 +2,23 @@
 
 All notable changes to `cargo-bless` are logged here.
 
+## 0.4.0 (2026-07-21)
+
+Maintenance release. No new rules or detectors — this restores the automation
+that had drifted red since 0.3.1 and raises the minimum Rust version.
+
+- **⚠️ MSRV raised 1.80 → 1.85.** `cargo-bless` shells out to `cargo metadata` on the crate you point it at, and modern dependency graphs now resolve to crates whose manifests require the `edition2024` feature. Cargo 1.80–1.84 cannot parse those manifests, so resolution failed with *"feature `edition2024` is required"* and the run exited with no output. `edition2024` stabilized in Rust 1.85, which is now the floor.
+- **Fixed: blessed.rs rule updates were failing.** blessed.rs began publishing "purposes" that point at the standard library and carry only a `see_also` list (e.g. *Lazy static variable initialization* → `std::sync::LazyLock`), omitting `recommendations` entirely. Deserialization aborted the whole fetch on the first such entry (*missing field `recommendations`*), so the scheduled **Update Rules** job had been failing. The field now defaults to empty and such purposes are skipped.
+- **Security: dependency advisories cleared.**
+  - `quinn-proto` 0.11.14 → 0.11.15 — [RUSTSEC-2026-0185](https://rustsec.org/advisories/RUSTSEC-2026-0185), remote memory exhaustion via unbounded out-of-order stream reassembly.
+  - `anyhow` 1.0.102 → 1.0.103 — [RUSTSEC-2026-0190](https://rustsec.org/advisories/RUSTSEC-2026-0190), unsoundness in `Error::downcast_mut()`.
+- **CI: Node 20 deprecation resolved.** `actions/checkout` v4 → v7 (node20 → node24) across all workflows.
+- **Fixed:** `clippy::question_mark` in `parse_github_url`, which broke the `-D warnings` gate on Rust 1.97.
+- **Fixed:** the `bs --diff` integration test no longer fails on machines that enforce commit signing.
+- **Added:** [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — the Rust Code of Conduct, adapted with this project's own moderation contact.
+- **Docs:** attributions, credits, and license clarifications.
+- **125 tests pass** on both `stable` and `1.85`.
+
 ## 0.3.1 (2026-05-03)
 
 - **False-positive elimination:** `#[test]` and `#[cfg(test)]` attribute+item pairs are now masked via tree-sitter before running any detector. Findings inside test functions no longer appear in the default report.
