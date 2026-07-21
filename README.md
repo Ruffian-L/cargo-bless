@@ -70,6 +70,7 @@ flowchart TD
 | **0.2.7** | New detectors (BoolComparison, StringAntiPattern, DiscardedError, LossyUtf8), 5 more rules, `bs --fix --dry-run` |
 | **0.3.0** | Security advisories via osv.dev, advisory data in JSON output, `--no-advisories` |
 | **0.3.1** | False-positive elimination: `#[test]` / `#[cfg(test)]` blocks masked via tree-sitter; default scan scope narrowed to `src/` (use `--include-tests` to opt in); non-`src/` crate layouts now scanned correctly |
+| **0.4.0** | Maintenance: **MSRV 1.80 → 1.85** (`edition2024` needed to resolve modern dep graphs), blessed.rs rule-update pipeline repaired, RUSTSEC advisories cleared, Node 20 CI deprecation fixed, Code of Conduct added |
 
 ## What it does
 
@@ -157,7 +158,7 @@ flowchart TB
 ```text
 $ cargo bless --workspace --offline
 
-🙏 cargo-bless v0.3.1
+🙏 cargo-bless v0.4.0
 
 📋 Scanning dependencies…
 
@@ -238,7 +239,7 @@ Example shape:
 
 ```
 cargo-bless feedback block
-version: 0.3.1
+version: 0.4.0
 direct_deps: 46
 total_deps: 624
 suggestions: 2
@@ -281,7 +282,7 @@ Synthetic screenshots below are trimmed for readability; your tree will differ.
 ### `cargo bless --summary` (paste-friendly roll-up)
 
 ```
-🙏 cargo-bless v0.3.1
+🙏 cargo-bless v0.4.0
 
 📊 Summary — scanned 1 workspace member
    • my-crate — 42 direct deps, 580 total in resolve
@@ -302,7 +303,7 @@ Top patterns:
 ```
 $ cargo bless --audit-code
 
-🙏 cargo-bless v0.3.1
+🙏 cargo-bless v0.4.0
 
 📋 Scanning dependencies...
 
@@ -354,7 +355,7 @@ Changes that would be applied:
 
 ```json
 {
-  "cargo_bless_version": "0.3.1",
+  "cargo_bless_version": "0.4.0",
   "workspace_scan": false,
   "packages": [
     {
