@@ -9,7 +9,7 @@ A Cargo subcommand that checks your dependencies against [blessed.rs](https://bl
 [![Crates.io](https://img.shields.io/crates/v/cargo-bless.svg?style=for-the-badge)](https://crates.io/crates/cargo-bless)
 [![docs.rs](https://img.shields.io/docsrs/cargo-bless?style=for-the-badge)](https://docs.rs/cargo-bless)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE-MIT)
-[![Rust MSRV](https://img.shields.io/badge/MSRV-1.80-orange?style=for-the-badge)](https://github.com/Ruffian-L/cargo-bless/blob/main/Cargo.toml#L5)
+[![Rust MSRV](https://img.shields.io/badge/MSRV-1.85-orange?style=for-the-badge)](https://github.com/Ruffian-L/cargo-bless/blob/main/Cargo.toml#L5)
 
 <sub>Powered by **[blessed.rs](https://blessed.rs/)** curated paths · optional crates.io + GitHub intel · optional **Cargo.toml‑only** autofix</sub>
 
