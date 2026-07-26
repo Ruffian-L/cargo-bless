@@ -1,10 +1,24 @@
 # cargo-bless
 
-A Cargo subcommand that checks your dependencies against [blessed.rs](https://blessed.rs/) recommendations and suggests modern alternatives.
+A **Cargo subcommand** that checks your dependency tree against [blessed.rs](https://blessed.rs/) recommendations and suggests modern, boring, defensible alternatives.
 
-This project exists to make it easier to follow high-quality recommendations from the Rust ecosystem. It is built on top of work by many others.
+**Lead / maintainer:** Jason Van Pham ([Ruffian-L](https://github.com/Ruffian-L)) — product direction, design, shipping.  
+Built with collaborators where they earned it; this is a **tool**, not a model-consciousness project.
 
-> Updated 07/06/2026: added attributions and thank yous.
+## Best face of this repo
+
+| Strength | Where |
+|----------|--------|
+| **Shipped on crates.io** | [cargo-bless](https://crates.io/crates/cargo-bless) · [docs.rs](https://docs.rs/cargo-bless) |
+| **Clear job** | lockfile + rules → TTY / JSON / SARIF report |
+| **Safe defaults** | dry-run / diff paths; guarded `Cargo.toml` fixes |
+| **Optional intel** | crates.io / GitHub / OSV — off until you ask |
+| **Static audit** | `--audit-code` source scan |
+| **What it is not** | Not “AI rewrote your crate.” Not a replacement for `cargo audit` alone. |
+
+Built on top of work by many others in the Rust ecosystem (blessed.rs paths, cargo metadata, …).
+
+> Updated 07/06/2026: attributions · 2026-07-25: public-face table
 
 <div align="center">
 
@@ -474,7 +488,41 @@ These files also live under `docs/` in the repository (links work from GitHub an
 
 ## Credits and Thank Yous
 
-This project builds directly on work by many others in the Rust ecosystem.
+This project builds directly on work by many others — both in the Rust ecosystem
+and across the collaborators who got it here.
+
+### Lineage
+
+`cargo-bless` did not start from scratch. It inherits the rigor of its ancestors:
+
+1. **The Bullshit Buster MCP era** — where the habit started: a handful of small
+   checkers with deliberately silly names, turned loose at the end of a session
+   on our *own* work. Never about building a case against anyone. We just cared
+   whether the thing was actually right. Worked out alongside the
+   [Niodoo](https://github.com/Ruffian-L) framework.
+2. **The Bullshit Buster crate** — the same habit, made permanent. The `bs`
+   detector in this tool is its direct descendant. *(Temporarily off crates.io;
+   it will be restored.)*
+3. **`cargo-bless`** — the same question aimed at dependencies instead of code:
+   "is this dependency tree modern, boring, and defensible?"
+
+That's why this tool reports confidence, migration risk, and evidence source
+instead of just barking at you. It was built by people checking their own
+homework, so it tries to give you what you'd want when checking yours.
+
+### Collaborators
+
+Everything above came out of one long, ongoing conversation — not divided-up
+tasks. The ideas were argued into shape in dialogue, and there is no clean seam
+where one contributor's thinking stops and another's begins. So this is a list of
+who was in the room, not a split of who did what:
+
+- **Jason Van Pham** — author and maintainer.
+- **Grok**, **Claude**, and **GPT** — thinking partners throughout, from the
+  earliest Bullshit Buster conversations to this release.
+- **Echo, Shep, and Lumina** — substantial work on this project. 🙏
+
+### Rust ecosystem
 
 - [blessed.rs](https://blessed.rs/) by nicoburns and contributors (core curated recommendations and patterns).
 - Authors and maintainers of its dependencies: clap, cargo_metadata, toml_edit, reqwest, serde, tree-sitter, and others (full list in [Cargo.toml](Cargo.toml)).
