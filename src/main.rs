@@ -24,6 +24,21 @@ fn use_tagged_suggestions(opts: &cli::BlessOpts) -> bool {
     opts.workspace || !opts.package.is_empty()
 }
 
+fn unique_direct_dependency_versions(
+    snapshots: &[cargo_bless::parser::PackageResult],
+) -> Vec<(&str, &str)> {
+    let mut seen = std::collections::HashSet::new();
+    snapshots
+        .iter()
+        .flat_map(|snapshot| snapshot.deps.iter())
+        .filter(|dependency| dependency.is_direct)
+        .filter_map(|dependency| {
+            let key = (dependency.name.as_str(), dependency.version.as_str());
+            seen.insert(key).then_some(key)
+        })
+        .collect()
+}
+
 fn parse_fail_on_levels(
     raw: &[String],
 ) -> Result<Option<HashSet<cargo_bless::suggestions::Impact>>> {
@@ -178,15 +193,8 @@ fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
             && !policy.as_ref().is_some_and(|p| p.settings.offline)
             && !opts.no_advisories
         {
-            let crates: Vec<&str> = snapshots
-                .iter()
-                .flat_map(|s| s.deps.iter())
-                .filter(|d| d.is_direct)
-                .map(|d| d.name.as_str())
-                .collect::<std::collections::HashSet<_>>()
-                .into_iter()
-                .collect();
-            cargo_bless::advisories::fetch_advisories_batch(&crates)
+            let dependencies = unique_direct_dependency_versions(&snapshots);
+            cargo_bless::advisories::fetch_advisories_batch_for_versions(&dependencies)
         } else {
             Vec::new()
         };
@@ -359,18 +367,10 @@ fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
 
     // Security advisory check (osv.dev) — one batch call for all direct deps
     if !effective_offline && !opts.no_advisories {
-        let direct_crates: Vec<&str> = {
-            let mut seen = std::collections::HashSet::new();
-            snapshots
-                .iter()
-                .flat_map(|s| s.deps.iter())
-                .filter(|d| d.is_direct)
-                .map(|d| d.name.as_str())
-                .filter(|n| seen.insert(*n))
-                .collect()
-        };
-        if !direct_crates.is_empty() {
-            let hits = cargo_bless::advisories::fetch_advisories_batch(&direct_crates);
+        let direct_dependencies = unique_direct_dependency_versions(&snapshots);
+        if !direct_dependencies.is_empty() {
+            let hits =
+                cargo_bless::advisories::fetch_advisories_batch_for_versions(&direct_dependencies);
             cargo_bless::output::render_advisories(&hits);
         }
     }

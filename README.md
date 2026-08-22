@@ -85,6 +85,7 @@ flowchart TD
 | **0.3.0** | Security advisories via osv.dev, advisory data in JSON output, `--no-advisories` |
 | **0.3.1** | False-positive elimination: `#[test]` / `#[cfg(test)]` blocks masked via tree-sitter; default scan scope narrowed to `src/` (use `--include-tests` to opt in); non-`src/` crate layouts now scanned correctly |
 | **0.4.0** | Maintenance: **MSRV 1.80 → 1.85** (`edition2024` needed to resolve modern dep graphs), blessed.rs rule-update pipeline repaired, RUSTSEC advisories cleared, Node 20 CI deprecation fixed, Code of Conduct added |
+| **0.4.1** | OSV checks now include exact resolved dependency versions, eliminating historical-advisory false positives |
 
 ## What it does
 
@@ -172,7 +173,7 @@ flowchart TB
 ```text
 $ cargo bless --workspace --offline
 
-🙏 cargo-bless v0.4.0
+🙏 cargo-bless v0.4.1
 
 📋 Scanning dependencies…
 
@@ -253,7 +254,7 @@ Example shape:
 
 ```
 cargo-bless feedback block
-version: 0.4.0
+version: 0.4.1
 direct_deps: 46
 total_deps: 624
 suggestions: 2
@@ -296,7 +297,7 @@ Synthetic screenshots below are trimmed for readability; your tree will differ.
 ### `cargo bless --summary` (paste-friendly roll-up)
 
 ```
-🙏 cargo-bless v0.4.0
+🙏 cargo-bless v0.4.1
 
 📊 Summary — scanned 1 workspace member
    • my-crate — 42 direct deps, 580 total in resolve
@@ -317,7 +318,7 @@ Top patterns:
 ```
 $ cargo bless --audit-code
 
-🙏 cargo-bless v0.4.0
+🙏 cargo-bless v0.4.1
 
 📋 Scanning dependencies...
 
@@ -369,7 +370,7 @@ Changes that would be applied:
 
 ```json
 {
-  "cargo_bless_version": "0.4.0",
+  "cargo_bless_version": "0.4.1",
   "workspace_scan": false,
   "packages": [
     {
@@ -471,7 +472,7 @@ Before any write, `--fix` creates a `Cargo.toml.bak` backup and runs `cargo upda
 2. Rules from `data/suggestions.json` are matched against direct deps (single-crate and combo patterns)
 3. `crates_io_api::SyncClient` fetches live metadata (cached to `~/.cache/cargo-bless/` with 1-hour TTL)
 4. `reqwest` checks GitHub for `pushed_at`, `archived`, and star count
-5. Security advisories are fetched in a single batch call to [osv.dev](https://osv.dev/) for all direct deps (skipped with `--offline` or `--no-advisories`; non-fatal)
+5. Security advisories are fetched in a single batch call to [osv.dev](https://osv.dev/) using each direct dependency's exact resolved version (skipped with `--offline` or `--no-advisories`; non-fatal)
 6. With `--audit-code` or `cargo bless bs`, the bullshit detector scans Rust files under `src/` by default (opt in to `tests/`, `examples/`, `benches/` with `--include-tests`); `#[test]` and `#[cfg(test)]` blocks are masked via tree-sitter so test code never pollutes the report
 7. `toml_edit` applies fixes while preserving comments and formatting
 

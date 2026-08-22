@@ -10,7 +10,7 @@
 | `suggestions` | Embedded `data/suggestions.json` rules (50 patterns); optionally augmented by fresh blessed-rs cache (**local patterns override cache**). Match deps and output `Suggestion` values |
 | `policy` | Optional `bless.toml` — ignore packages, limits, code-audit filters |
 | `intel` | Optional crates.io + GitHub metadata (cached under `~/.cache/cargo-bless/`); skipped when `--offline` or `[settings].offline` |
-| `advisories` | Optional osv.dev batch advisory lookup for direct deps; skipped when `--offline` or `--no-advisories`; non-fatal |
+| `advisories` | Optional osv.dev batch advisory lookup for exact resolved direct-dependency versions; skipped when `--offline` or `--no-advisories`; non-fatal |
 | `feedback` | `--feedback` — aggregate counts + code-audit "hotspots" without listing crate names or hitting the network |
 | `output` | Human-readable reports, JSON helpers (`JsonReportUnified`), code-audit summary, advisory rendering |
 | `fix` | `toml_edit` — apply `Cargo.toml`-only autofixes; backup + optional `cargo update` |
@@ -23,7 +23,7 @@
 1. Parse CLI (`src/cli.rs`) → validate flag combinations (`main.rs`).
 2. Resolve deps (`parser`).
 3. Load rules (`suggestions::load_rules`) → analyze (`suggestions::analyze`) → apply policy (`policy`).
-4. If not `--offline` / not policy-offline and there are direct deps, bulk-fetch security advisories (`advisories::fetch_advisories_batch`); non-fatal.
+4. If not `--offline` / not policy-offline and there are direct deps, bulk-fetch security advisories for their exact resolved versions (`advisories::fetch_advisories_batch_for_versions`); non-fatal.
 5. If not `--offline` and there are suggestions, bulk-fetch live intel (`intel`).
 6. Print modernization report (`output::render_report`).
 7. If `--audit-code`, scan sources (`code_audit::scan_project`) and print findings (`output::render_code_audit_report`).

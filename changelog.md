@@ -2,6 +2,13 @@
 
 All notable changes to `cargo-bless` are logged here.
 
+## 0.4.1 (2026-08-22)
+
+- **Fixed: OSV advisory false positives.** Advisory queries now include each direct dependency's exact resolved version. Previously cargo-bless sent only crate names, causing OSV to return every historical advisory for packages such as `anyhow`, `regex`, and `tokio`, even when the locked versions were not affected.
+- **Compatibility:** The public name-only advisory function remains available, while both human and JSON CLI paths use the new version-aware function.
+- **Regression coverage:** Request-shape tests verify that resolved versions are serialized to OSV and that the compatibility path continues to omit them intentionally.
+- **127 tests pass** on both `stable` and `1.85`.
+
 ## 0.4.0 (2026-08-22)
 
 Maintenance release. No new rules or detectors — this restores the automation

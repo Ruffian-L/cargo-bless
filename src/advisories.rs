@@ -49,6 +49,8 @@ struct OsvBatchRequest {
 
 #[derive(Serialize)]
 struct OsvPackageQuery {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
     package: OsvPackage,
 }
 
@@ -79,11 +81,54 @@ struct OsvVuln {
     aliases: Vec<String>,
 }
 
-/// Fetch advisories for `crate_names` in one batch request.
+/// Fetch all historical advisories for `crate_names` in one batch request.
+///
+/// This name-only API is retained for compatibility. Call
+/// [`fetch_advisories_batch_for_versions`] when checking resolved dependencies;
+/// without versions, OSV returns advisories that may not affect the installed
+/// release.
 /// Returns only crates that have at least one advisory.
 /// All network or parse errors are swallowed — returns `[]` on failure.
 pub fn fetch_advisories_batch(crate_names: &[&str]) -> Vec<CrateAdvisories> {
-    if crate_names.is_empty() {
+    let queries = crate_names
+        .iter()
+        .map(|name| OsvPackageQuery {
+            version: None,
+            package: OsvPackage {
+                name: name.to_string(),
+                ecosystem: "crates.io",
+            },
+        })
+        .collect();
+
+    fetch_advisories(queries)
+}
+
+/// Fetch advisories that affect the exact resolved crate versions.
+///
+/// Each tuple is `(crate_name, resolved_version)`. OSV uses the version to
+/// filter out historical advisories that do not affect the installed release.
+pub fn fetch_advisories_batch_for_versions(
+    crate_versions: &[(&str, &str)],
+) -> Vec<CrateAdvisories> {
+    fetch_advisories(versioned_queries(crate_versions))
+}
+
+fn versioned_queries(crate_versions: &[(&str, &str)]) -> Vec<OsvPackageQuery> {
+    crate_versions
+        .iter()
+        .map(|(name, version)| OsvPackageQuery {
+            version: Some(version.to_string()),
+            package: OsvPackage {
+                name: name.to_string(),
+                ecosystem: "crates.io",
+            },
+        })
+        .collect()
+}
+
+fn fetch_advisories(queries: Vec<OsvPackageQuery>) -> Vec<CrateAdvisories> {
+    if queries.is_empty() {
         return Vec::new();
     }
 
@@ -96,17 +141,7 @@ pub fn fetch_advisories_batch(crate_names: &[&str]) -> Vec<CrateAdvisories> {
         Err(_) => return Vec::new(),
     };
 
-    let request = OsvBatchRequest {
-        queries: crate_names
-            .iter()
-            .map(|name| OsvPackageQuery {
-                package: OsvPackage {
-                    name: name.to_string(),
-                    ecosystem: "crates.io",
-                },
-            })
-            .collect(),
-    };
+    let request = OsvBatchRequest { queries };
 
     let batch: OsvBatchResponse = match client
         .post(OSV_BATCH_URL)
@@ -119,12 +154,13 @@ pub fn fetch_advisories_batch(crate_names: &[&str]) -> Vec<CrateAdvisories> {
         Err(_) => return Vec::new(),
     };
 
-    crate_names
+    request
+        .queries
         .iter()
         .zip(batch.results.iter())
         .filter(|(_, result)| !result.vulns.is_empty())
-        .map(|(name, result)| CrateAdvisories {
-            crate_name: name.to_string(),
+        .map(|(query, result)| CrateAdvisories {
+            crate_name: query.package.name.clone(),
             advisories: result
                 .vulns
                 .iter()
@@ -139,4 +175,37 @@ pub fn fetch_advisories_batch(crate_names: &[&str]) -> Vec<CrateAdvisories> {
                 .collect(),
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn versioned_queries_serialize_the_exact_version() {
+        let request = OsvBatchRequest {
+            queries: versioned_queries(&[("anyhow", "1.0.103")]),
+        };
+
+        let json = serde_json::to_value(request).expect("serialize OSV request");
+        assert_eq!(json["queries"][0]["version"], "1.0.103");
+        assert_eq!(json["queries"][0]["package"]["name"], "anyhow");
+        assert_eq!(json["queries"][0]["package"]["ecosystem"], "crates.io");
+    }
+
+    #[test]
+    fn compatibility_queries_omit_the_version() {
+        let request = OsvBatchRequest {
+            queries: vec![OsvPackageQuery {
+                version: None,
+                package: OsvPackage {
+                    name: "anyhow".to_string(),
+                    ecosystem: "crates.io",
+                },
+            }],
+        };
+
+        let json = serde_json::to_value(request).expect("serialize OSV request");
+        assert!(json["queries"][0].get("version").is_none());
+    }
 }
