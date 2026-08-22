@@ -24,7 +24,6 @@ fn use_tagged_suggestions(opts: &cli::BlessOpts) -> bool {
     opts.workspace || !opts.package.is_empty()
 }
 
-
 fn parse_fail_on_levels(
     raw: &[String],
 ) -> Result<Option<HashSet<cargo_bless::suggestions::Impact>>> {
@@ -104,7 +103,8 @@ fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
     let policy = load_policy(opts.policy.as_deref(), manifest)?;
 
     let effective_fail_on: Vec<String> = if opts.fail_on.is_empty() {
-        policy.as_ref()
+        policy
+            .as_ref()
             .and_then(|p| p.fail_on.clone())
             .unwrap_or_default()
     } else {
@@ -119,8 +119,8 @@ fn run_bless_command(opts: cli::BlessOpts) -> Result<()> {
     let run_code_audit = opts.audit_code;
     let code_audit_config = cargo_bless::code_audit::config_from_policy(policy.as_ref());
     let tagged = use_tagged_suggestions(&opts);
-    let effective_all_targets = opts.all_targets
-        || policy.as_ref().is_some_and(|p| p.settings.all_targets);
+    let effective_all_targets =
+        opts.all_targets || policy.as_ref().is_some_and(|p| p.settings.all_targets);
     let snapshots = cargo_bless::parser::get_package_snapshots(
         manifest,
         opts.workspace,
@@ -430,8 +430,7 @@ fn run_summary_mode(
 ) -> Result<()> {
     let manifest = opts.manifest_path.as_deref();
     let tagged = use_tagged_suggestions(opts);
-    let effective_all_targets = opts.all_targets
-        || policy.is_some_and(|p| p.settings.all_targets);
+    let effective_all_targets = opts.all_targets || policy.is_some_and(|p| p.settings.all_targets);
     let snapshots = cargo_bless::parser::get_package_snapshots(
         manifest,
         opts.workspace,
@@ -735,7 +734,11 @@ fn run_explain(pattern: &str) -> Result<()> {
         println!("  {:<16} {}", "Replace with:".bold(), rule.replacement);
         println!("  {:<16} {:?}", "Kind:".bold(), rule.kind);
         println!("  {:<16} {:?}", "Confidence:".bold(), rule.confidence);
-        println!("  {:<16} {:?}", "Migration risk:".bold(), rule.migration_risk);
+        println!(
+            "  {:<16} {:?}",
+            "Migration risk:".bold(),
+            rule.migration_risk
+        );
         if let Some(ref cond) = rule.condition {
             println!("  {:<16} {}", "Condition:".bold(), cond);
         }

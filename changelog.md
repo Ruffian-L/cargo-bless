@@ -2,7 +2,7 @@
 
 All notable changes to `cargo-bless` are logged here.
 
-## 0.4.0 (2026-07-21)
+## 0.4.0 (2026-08-22)
 
 Maintenance release. No new rules or detectors — this restores the automation
 that had drifted red since 0.3.1 and raises the minimum Rust version.
@@ -15,6 +15,8 @@ that had drifted red since 0.3.1 and raises the minimum Rust version.
 - **CI: Node 20 deprecation resolved.** `actions/checkout` v4 → v7 (node20 → node24) across all workflows.
 - **Fixed:** `clippy::question_mark` in `parse_github_url`, which broke the `-D warnings` gate on Rust 1.97.
 - **Fixed:** the `bs --diff` integration test no longer fails on machines that enforce commit signing.
+- **Rules verified:** refreshed against blessed.rs on release day; all three current migration signals were already covered by the 50 embedded rules, so no rule-data change was needed.
+- **Maintenance:** normalized source and integration tests with stable `rustfmt` before packaging.
 - **Added:** [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) — the Rust Code of Conduct, adapted with this project's own moderation contact.
 - **Docs:** attributions, credits, and license clarifications.
 - **125 tests pass** on both `stable` and `1.85`.

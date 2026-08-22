@@ -1172,7 +1172,9 @@ edition = "2021"
         .arg("--policy")
         .arg(&policy_path);
 
-    let output = cmd.output().expect("run cargo-bless bs with min_confidence policy");
+    let output = cmd
+        .output()
+        .expect("run cargo-bless bs with min_confidence policy");
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(output.status.success(), "should exit 0: {}", stdout);
@@ -1217,7 +1219,9 @@ edition = "2021"
         .arg("--fail-on-confidence")
         .arg("0.5");
 
-    let output = cmd.output().expect("run cargo-bless bs --fail-on-confidence");
+    let output = cmd
+        .output()
+        .expect("run cargo-bless bs --fail-on-confidence");
     let stderr = String::from_utf8_lossy(&output.stderr);
 
     assert!(
@@ -1261,10 +1265,21 @@ edition = "2021"
     let output = cmd.output().expect("run cargo bless --init-ci");
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    assert!(output.status.success(), "first run should exit 0: {}", stdout);
+    assert!(
+        output.status.success(),
+        "first run should exit 0: {}",
+        stdout
+    );
 
-    let workflow_path = tmp.path().join(".github").join("workflows").join("bless.yml");
-    assert!(workflow_path.exists(), ".github/workflows/bless.yml should be created");
+    let workflow_path = tmp
+        .path()
+        .join(".github")
+        .join("workflows")
+        .join("bless.yml");
+    assert!(
+        workflow_path.exists(),
+        ".github/workflows/bless.yml should be created"
+    );
 
     let contents = fs::read_to_string(&workflow_path).expect("read workflow file");
     assert!(
@@ -1436,11 +1451,7 @@ edition = "2021"
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     assert!(output.status.success(), "should exit 0: {}", stdout);
-    assert!(
-        stdout.contains("Dry-run"),
-        "should say dry-run: {}",
-        stdout
-    );
+    assert!(stdout.contains("Dry-run"), "should say dry-run: {}", stdout);
     assert!(
         stdout.contains("would be replaced"),
         "should say what would be replaced: {}",
@@ -1453,7 +1464,10 @@ edition = "2021"
         "source file must not be modified by --dry-run"
     );
     let backup = tmp.path().join("src/main.rs.bak");
-    assert!(!backup.exists(), "no backup should be written during --dry-run");
+    assert!(
+        !backup.exists(),
+        "no backup should be written during --dry-run"
+    );
 }
 
 #[test]
@@ -1689,10 +1703,7 @@ edition = "2021"
 
 #[test]
 fn test_no_advisories_flag_accepted() {
-    cargo_bless_cmd()
-        .arg("--no-advisories")
-        .assert()
-        .success();
+    cargo_bless_cmd().arg("--no-advisories").assert().success();
 }
 
 #[test]
