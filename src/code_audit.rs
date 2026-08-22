@@ -608,14 +608,18 @@ fn scan_line_patterns(code: &str, file: &Path, alerts: &mut Vec<BullshitAlert>) 
             ));
         }
 
-        if line.contains("== true") || line.contains("== false")
-            || line.contains("!= true") || line.contains("!= false")
+        if line.contains("== true")
+            || line.contains("== false")
+            || line.contains("!= true")
+            || line.contains("!= false")
         {
-            let col = line.find("== true")
+            let col = line
+                .find("== true")
                 .or_else(|| line.find("== false"))
                 .or_else(|| line.find("!= true"))
                 .or_else(|| line.find("!= false"))
-                .unwrap_or(0) + 1;
+                .unwrap_or(0)
+                + 1;
             alerts.push(alert_from_line(
                 BullshitKind::BoolComparison,
                 0.68,
@@ -629,9 +633,11 @@ fn scan_line_patterns(code: &str, file: &Path, alerts: &mut Vec<BullshitAlert>) 
         }
 
         if line.contains(".to_string().as_str()") || line.contains(".to_owned().as_str()") {
-            let col = line.find(".to_string().as_str()")
+            let col = line
+                .find(".to_string().as_str()")
                 .or_else(|| line.find(".to_owned().as_str()"))
-                .unwrap_or(0) + 1;
+                .unwrap_or(0)
+                + 1;
             alerts.push(alert_from_line(
                 BullshitKind::StringAntiPattern,
                 0.74,

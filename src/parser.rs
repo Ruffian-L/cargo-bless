@@ -2,7 +2,9 @@
 //! using `cargo_metadata` for feature-aware resolution.
 
 use anyhow::{bail, Result};
-use cargo_metadata::{CargoOpt, DependencyKind, MetadataCommand, Node, Package, PackageId, Resolve};
+use cargo_metadata::{
+    CargoOpt, DependencyKind, MetadataCommand, Node, Package, PackageId, Resolve,
+};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -90,8 +92,7 @@ fn build_pkg_lookup(metadata: &cargo_metadata::Metadata) -> HashMap<String, Pack
 /// **Key change**: uses `resolve.nodes[].features` for the **actual enabled features**
 /// rather than `pkg.features.keys()` which only lists declared/available features.
 pub fn get_deps(manifest_path: Option<&Path>) -> Result<Vec<ResolvedDep>> {
-    let snapshots =
-        fetch_metadata_and_snapshots(manifest_path, SnapshotMode::RootOnly, false)?;
+    let snapshots = fetch_metadata_and_snapshots(manifest_path, SnapshotMode::RootOnly, false)?;
     snapshots
         .into_iter()
         .next()
@@ -249,12 +250,7 @@ fn resolve_deps_for_root(
     let direct_dep_ids: HashSet<String> = root_node
         .deps
         .iter()
-        .filter(|d| {
-            all_targets
-                || d.dep_kinds
-                    .iter()
-                    .any(|k| k.kind == DependencyKind::Normal)
-        })
+        .filter(|d| all_targets || d.dep_kinds.iter().any(|k| k.kind == DependencyKind::Normal))
         .map(|d| d.pkg.to_string())
         .collect();
 

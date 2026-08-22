@@ -418,10 +418,7 @@ pub fn render_advisories(advisories: &[crate::advisories::CrateAdvisories]) {
             format!("({count} advisory{})", if count == 1 { "" } else { "ies" }).dimmed()
         );
         for adv in &hit.advisories {
-            let cve_tag = adv
-                .cve()
-                .map(|c| format!(" · {c}"))
-                .unwrap_or_default();
+            let cve_tag = adv.cve().map(|c| format!(" · {c}")).unwrap_or_default();
             println!(
                 "     {} {}{}",
                 adv.id.red().bold(),
@@ -592,9 +589,7 @@ pub fn render_sarif(report: &CodeAuditReport) {
                             uri,
                             uri_base_id: "%SRCROOT%",
                         },
-                        region: SarifRegion {
-                            start_line: a.line,
-                        },
+                        region: SarifRegion { start_line: a.line },
                     },
                 }],
             }
