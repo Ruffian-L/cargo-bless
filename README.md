@@ -3,7 +3,7 @@
 A **Cargo subcommand** that checks your dependency tree against [blessed.rs](https://blessed.rs/) recommendations and suggests modern, boring, defensible alternatives.
 
 **Lead / maintainer:** Jason Van Pham ([Ruffian-L](https://github.com/Ruffian-L)) — product direction, design, shipping.  
-Built with collaborators where they earned it; this is a **tool**, not a model-consciousness project.
+Built with collaborators where they earned it.
 
 ## Best face of this repo
 
@@ -14,7 +14,7 @@ Built with collaborators where they earned it; this is a **tool**, not a model-c
 | **Safe defaults** | dry-run / diff paths; guarded `Cargo.toml` fixes |
 | **Optional intel** | crates.io / GitHub / OSV — off until you ask |
 | **Static audit** | `--audit-code` source scan |
-| **What it is not** | Not “AI rewrote your crate.” Not a replacement for `cargo audit` alone. |
+| **Scope** | Lockfile + rules report; not a replacement for `cargo audit` alone |
 
 Built on top of work by many others in the Rust ecosystem (blessed.rs paths, cargo metadata, …).
 
